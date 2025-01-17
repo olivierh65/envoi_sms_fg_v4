@@ -9,21 +9,19 @@ import 'database.dart'; // fichier Drift
 
 class Traitement {
   // Déclarez un Completer pour suivre l'état du traitement
-  late final Completer<void> _completer;
+  Completer<void>? completer;
   static bool _isPaused  = false;
   late StreamController<void> _pauseController;
-  final AppDatabase database; // Base Drift injectée
+  late AppDatabase _database; // Base Drift injectée
   final StreamController<List<Message>> _streamController = StreamController.broadcast();
 
-  Traitement (this.database, {bool paused = true}) {
+  Traitement (database, {bool paused = true}) {
     _isPaused = paused;
-    _completer = Completer();
+    _database = database;
     _pauseController = StreamController<void>.broadcast();
   }
 
   Stream<List<Message>> get messageStream => _streamController.stream;
-
-  Completer<void> get completer => _completer;
 
   Future<void> loadState() async {
     // Simule la récupération de l'état sauvegardé
@@ -60,9 +58,9 @@ class Traitement {
 
       for (var item in jsonData) {
         try {
-          await database.insertMessage(
+          await _database.insertMessage(
             MessagesCompanion(
-              destinataire: Value(item['destinataire']),
+              number: Value(item['number']),
               message: Value(item['message']),
               messageId: Value(item['messageId']),
               jobId: Value(item['jobId']),
@@ -76,13 +74,13 @@ class Traitement {
       _updateMessageStream(); // Mettre à jour le stream après l'insertion
     }
 
-    if (!completer.isCompleted) {
-      completer.complete(); // Signaler la fin du traitement
+    if (!completer!.isCompleted) {
+      completer!.complete(); // Signaler la fin du traitement
     }
   }
 
   Future<void> _updateMessageStream() async {
-    final updatedMessages = await database.getAllMessages();
+    final updatedMessages = await _database.getAllMessages();
     _streamController.add(updatedMessages);
   }
 
@@ -131,8 +129,13 @@ class Traitement {
     }
   }
 
+  void stopProcessing() {
+    completer?.complete(); // Compléter le Completer si il existe
+  }
+
   // Méthode pour nettoyer les ressources
-  void dispose() {
+  Future<void> dispose() async {
+    await _database.close();
     _streamController.close();
     _pauseController.close(); // Fermer aussi _pauseController
   }

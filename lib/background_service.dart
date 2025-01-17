@@ -1,21 +1,26 @@
 import 'dart:async';
+import 'dart:ui';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter_background_service/flutter_background_service.dart';
-import 'app_singleton.dart';
 import 'traitement.dart';
 import 'database.dart';
 
 
 class BackgroundServiceManager {
   final FlutterBackgroundService _service = FlutterBackgroundService();
-  final AppDatabase _database;
-  final Traitement _traitement; // Reçu via le constructeur
   static Timer? _timer;
-  static Traitement get _traitementStatic => _backgroundServiceManagerStatic._traitement;
-  static late BackgroundServiceManager _backgroundServiceManagerStatic;
+  late final AppDatabase _database;
+  late final Traitement _traitement;
+  final StreamController<List<Message>> _smsStreamController = StreamController<List<Message>>.broadcast();
 
-  BackgroundServiceManager(this._database, this._traitement);
+  BackgroundServiceManager() {
+    _database = AppDatabase();
+    _traitement = Traitement(_database);
+  }
 
+  Traitement get traitement => _traitement;
+
+  Stream<List<Message>> get smsStream => _database.watchAllMessage();
   bool isRunning = false;
   get dataStream => null;
 
@@ -41,11 +46,13 @@ class BackgroundServiceManager {
 
   // Fonction qui sera exécutée lorsque le service démarre
   static void onStart(ServiceInstance service) async {
-    final appSingleton = AppSingleton();
-    final database = appSingleton.database;
-    final traitement = appSingleton.traitement;
-    // Obtenez l'instance de SharedPreferences dans le service en arrière-plan
+    DartPluginRegistrant.ensureInitialized();
     final prefs = await SharedPreferences.getInstance();
+    //Récupération de l'instance du BackgroundServiceManager
+    final backgroundServiceManager = BackgroundServiceManager();
+
+    final completer = Completer<void>();
+    backgroundServiceManager._traitement.completer = completer;
 
     if (service is AndroidServiceInstance) {
       service.setAsForegroundService();
@@ -55,29 +62,36 @@ class BackgroundServiceManager {
       );
 
       service.on('stopService').listen((event) async {
-        if (traitement.completer.isCompleted) {
+        if (backgroundServiceManager._traitement.completer!.isCompleted) {
+          await backgroundServiceManager._database.close(); // Fermeture de la base de données
           service.stopSelf();
         } else {
           print("Attente fin de traitement");
-          await traitement.completer.future;
+          await backgroundServiceManager._traitement.completer!.future;
+          await backgroundServiceManager._database.close(); // Fermeture de la base de données
+          service.stopSelf();
         }
       });
 
       service.on('startTraitement').listen((event) {
-        traitement.doWork(service, prefs);
-        _startTimer(service, traitement); // Démarrer le timer ici
+        backgroundServiceManager._traitement.doWork(service, prefs);
+        _startTimer(service, backgroundServiceManager._traitement); // Démarrer le timer ici
+      });
+
+      service.on('stopTraitement').listen((event) {
+        backgroundServiceManager._traitement.stopProcessing();
       });
 
       service.on('pause').listen((_) {
-        traitement.pause();
+        backgroundServiceManager._traitement.pause();
         _stopTimer();
         service.invoke('update', {"current_time": 'Pause'});
       });
 
       service.on('resume').listen((_) {
-        traitement.resume();
-        traitement.doWork(service, prefs);
-        _startTimer(service, traitement);
+        backgroundServiceManager._traitement.resume();
+        backgroundServiceManager._traitement.doWork(service, prefs);
+        _startTimer(service, backgroundServiceManager._traitement);
       });
     }
   }
@@ -98,8 +112,14 @@ class BackgroundServiceManager {
     }
   }
 
+  //Méthode pour declencher startProcessing depuis Accueil
   void startTraitement() {
-    _service.invoke('startTraitement');
+    _service.invoke("startTraitement");
+  }
+
+  //Méthode pour declencher stopProcessing depuis Accueil
+  void stopTraitement() {
+    _service.invoke("stopTraitement");
   }
 
   void pauseTraitement() {
@@ -108,6 +128,11 @@ class BackgroundServiceManager {
 
   void resumeTraitement() {
     _service.invoke('resume');
+  }
+
+  void dispose() {
+    _smsStreamController.close();
+    _database.close();
   }
 
   static bool onIosBackground(ServiceInstance service) {

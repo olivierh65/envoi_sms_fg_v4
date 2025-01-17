@@ -3,7 +3,6 @@ import 'dart:collection';
 import 'package:flutter/material.dart';
 import 'package:flutter_easyloading/flutter_easyloading.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'app_singleton.dart';
 import 'shared_preferences_provider.dart';
 import 'app_preferences.dart';
 import '/route_generator.dart';
@@ -28,21 +27,13 @@ void main() async {
   // Initialisation des préférences
   _initPrefs();
 
-  // Initialiser le singleton
-  final appSingleton = AppSingleton();
-
-  // Utiliser les instances partagées
-  final database = appSingleton.database;
-  final traitement = appSingleton.traitement;
-
   // Initialiser BackgroundServiceManager avec les instances partagées
-  final backgroundService = BackgroundServiceManager(database, traitement);
+  final backgroundService = BackgroundServiceManager();
   await backgroundService.initialize();
 
   // Créer l'instance de MyappArgs
   final myappArgs = MyappArgs();
   myappArgs.backgroundService  = backgroundService ;
-  myappArgs.traitement = traitement; // Passer traitement via MyappArgs
 
   // Personnaliser EasyLoading
   EasyLoading.instance

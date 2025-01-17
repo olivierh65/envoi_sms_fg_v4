@@ -17,29 +17,28 @@ class $MessagesTable extends Messages with TableInfo<$MessagesTable, Message> {
       requiredDuringInsert: false,
       defaultConstraints:
           GeneratedColumn.constraintIsAlways('PRIMARY KEY AUTOINCREMENT'));
-  static const VerificationMeta _destinataireMeta =
-      const VerificationMeta('destinataire');
+  static const VerificationMeta _numberMeta = const VerificationMeta('number');
   @override
-  late final GeneratedColumn<String> destinataire = GeneratedColumn<String>(
-      'destinataire', aliasedName, false,
-      type: DriftSqlType.string, requiredDuringInsert: true);
+  late final GeneratedColumn<String> number = GeneratedColumn<String>(
+      'number', aliasedName, true,
+      type: DriftSqlType.string, requiredDuringInsert: false);
   static const VerificationMeta _messageMeta =
       const VerificationMeta('message');
   @override
   late final GeneratedColumn<String> message = GeneratedColumn<String>(
-      'message', aliasedName, false,
-      type: DriftSqlType.string, requiredDuringInsert: true);
+      'message', aliasedName, true,
+      type: DriftSqlType.string, requiredDuringInsert: false);
   static const VerificationMeta _messageIdMeta =
       const VerificationMeta('messageId');
   @override
   late final GeneratedColumn<String> messageId = GeneratedColumn<String>(
-      'message_id', aliasedName, false,
-      type: DriftSqlType.string, requiredDuringInsert: true);
+      'message_id', aliasedName, true,
+      type: DriftSqlType.string, requiredDuringInsert: false);
   static const VerificationMeta _jobIdMeta = const VerificationMeta('jobId');
   @override
   late final GeneratedColumn<int> jobId = GeneratedColumn<int>(
-      'job_id', aliasedName, false,
-      type: DriftSqlType.int, requiredDuringInsert: true);
+      'job_id', aliasedName, true,
+      type: DriftSqlType.int, requiredDuringInsert: false);
   static const VerificationMeta _retrieveDateMeta =
       const VerificationMeta('retrieveDate');
   @override
@@ -61,7 +60,7 @@ class $MessagesTable extends Messages with TableInfo<$MessagesTable, Message> {
   @override
   List<GeneratedColumn> get $columns => [
         id,
-        destinataire,
+        number,
         message,
         messageId,
         jobId,
@@ -82,31 +81,21 @@ class $MessagesTable extends Messages with TableInfo<$MessagesTable, Message> {
     if (data.containsKey('id')) {
       context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
     }
-    if (data.containsKey('destinataire')) {
-      context.handle(
-          _destinataireMeta,
-          destinataire.isAcceptableOrUnknown(
-              data['destinataire']!, _destinataireMeta));
-    } else if (isInserting) {
-      context.missing(_destinataireMeta);
+    if (data.containsKey('number')) {
+      context.handle(_numberMeta,
+          number.isAcceptableOrUnknown(data['number']!, _numberMeta));
     }
     if (data.containsKey('message')) {
       context.handle(_messageMeta,
           message.isAcceptableOrUnknown(data['message']!, _messageMeta));
-    } else if (isInserting) {
-      context.missing(_messageMeta);
     }
     if (data.containsKey('message_id')) {
       context.handle(_messageIdMeta,
           messageId.isAcceptableOrUnknown(data['message_id']!, _messageIdMeta));
-    } else if (isInserting) {
-      context.missing(_messageIdMeta);
     }
     if (data.containsKey('job_id')) {
       context.handle(
           _jobIdMeta, jobId.isAcceptableOrUnknown(data['job_id']!, _jobIdMeta));
-    } else if (isInserting) {
-      context.missing(_jobIdMeta);
     }
     if (data.containsKey('retrieve_date')) {
       context.handle(
@@ -135,14 +124,14 @@ class $MessagesTable extends Messages with TableInfo<$MessagesTable, Message> {
     return Message(
       id: attachedDatabase.typeMapping
           .read(DriftSqlType.int, data['${effectivePrefix}id'])!,
-      destinataire: attachedDatabase.typeMapping
-          .read(DriftSqlType.string, data['${effectivePrefix}destinataire'])!,
+      number: attachedDatabase.typeMapping
+          .read(DriftSqlType.string, data['${effectivePrefix}number']),
       message: attachedDatabase.typeMapping
-          .read(DriftSqlType.string, data['${effectivePrefix}message'])!,
+          .read(DriftSqlType.string, data['${effectivePrefix}message']),
       messageId: attachedDatabase.typeMapping
-          .read(DriftSqlType.string, data['${effectivePrefix}message_id'])!,
+          .read(DriftSqlType.string, data['${effectivePrefix}message_id']),
       jobId: attachedDatabase.typeMapping
-          .read(DriftSqlType.int, data['${effectivePrefix}job_id'])!,
+          .read(DriftSqlType.int, data['${effectivePrefix}job_id']),
       retrieveDate: attachedDatabase.typeMapping
           .read(DriftSqlType.dateTime, data['${effectivePrefix}retrieve_date']),
       sentDate: attachedDatabase.typeMapping
@@ -160,19 +149,19 @@ class $MessagesTable extends Messages with TableInfo<$MessagesTable, Message> {
 
 class Message extends DataClass implements Insertable<Message> {
   final int id;
-  final String destinataire;
-  final String message;
-  final String messageId;
-  final int jobId;
+  final String? number;
+  final String? message;
+  final String? messageId;
+  final int? jobId;
   final DateTime? retrieveDate;
   final DateTime? sentDate;
   final DateTime? deliveredDate;
   const Message(
       {required this.id,
-      required this.destinataire,
-      required this.message,
-      required this.messageId,
-      required this.jobId,
+      this.number,
+      this.message,
+      this.messageId,
+      this.jobId,
       this.retrieveDate,
       this.sentDate,
       this.deliveredDate});
@@ -180,10 +169,18 @@ class Message extends DataClass implements Insertable<Message> {
   Map<String, Expression> toColumns(bool nullToAbsent) {
     final map = <String, Expression>{};
     map['id'] = Variable<int>(id);
-    map['destinataire'] = Variable<String>(destinataire);
-    map['message'] = Variable<String>(message);
-    map['message_id'] = Variable<String>(messageId);
-    map['job_id'] = Variable<int>(jobId);
+    if (!nullToAbsent || number != null) {
+      map['number'] = Variable<String>(number);
+    }
+    if (!nullToAbsent || message != null) {
+      map['message'] = Variable<String>(message);
+    }
+    if (!nullToAbsent || messageId != null) {
+      map['message_id'] = Variable<String>(messageId);
+    }
+    if (!nullToAbsent || jobId != null) {
+      map['job_id'] = Variable<int>(jobId);
+    }
     if (!nullToAbsent || retrieveDate != null) {
       map['retrieve_date'] = Variable<DateTime>(retrieveDate);
     }
@@ -199,10 +196,16 @@ class Message extends DataClass implements Insertable<Message> {
   MessagesCompanion toCompanion(bool nullToAbsent) {
     return MessagesCompanion(
       id: Value(id),
-      destinataire: Value(destinataire),
-      message: Value(message),
-      messageId: Value(messageId),
-      jobId: Value(jobId),
+      number:
+          number == null && nullToAbsent ? const Value.absent() : Value(number),
+      message: message == null && nullToAbsent
+          ? const Value.absent()
+          : Value(message),
+      messageId: messageId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(messageId),
+      jobId:
+          jobId == null && nullToAbsent ? const Value.absent() : Value(jobId),
       retrieveDate: retrieveDate == null && nullToAbsent
           ? const Value.absent()
           : Value(retrieveDate),
@@ -220,10 +223,10 @@ class Message extends DataClass implements Insertable<Message> {
     serializer ??= driftRuntimeOptions.defaultSerializer;
     return Message(
       id: serializer.fromJson<int>(json['id']),
-      destinataire: serializer.fromJson<String>(json['destinataire']),
-      message: serializer.fromJson<String>(json['message']),
-      messageId: serializer.fromJson<String>(json['messageId']),
-      jobId: serializer.fromJson<int>(json['jobId']),
+      number: serializer.fromJson<String?>(json['number']),
+      message: serializer.fromJson<String?>(json['message']),
+      messageId: serializer.fromJson<String?>(json['messageId']),
+      jobId: serializer.fromJson<int?>(json['jobId']),
       retrieveDate: serializer.fromJson<DateTime?>(json['retrieveDate']),
       sentDate: serializer.fromJson<DateTime?>(json['sentDate']),
       deliveredDate: serializer.fromJson<DateTime?>(json['deliveredDate']),
@@ -234,10 +237,10 @@ class Message extends DataClass implements Insertable<Message> {
     serializer ??= driftRuntimeOptions.defaultSerializer;
     return <String, dynamic>{
       'id': serializer.toJson<int>(id),
-      'destinataire': serializer.toJson<String>(destinataire),
-      'message': serializer.toJson<String>(message),
-      'messageId': serializer.toJson<String>(messageId),
-      'jobId': serializer.toJson<int>(jobId),
+      'number': serializer.toJson<String?>(number),
+      'message': serializer.toJson<String?>(message),
+      'messageId': serializer.toJson<String?>(messageId),
+      'jobId': serializer.toJson<int?>(jobId),
       'retrieveDate': serializer.toJson<DateTime?>(retrieveDate),
       'sentDate': serializer.toJson<DateTime?>(sentDate),
       'deliveredDate': serializer.toJson<DateTime?>(deliveredDate),
@@ -246,19 +249,19 @@ class Message extends DataClass implements Insertable<Message> {
 
   Message copyWith(
           {int? id,
-          String? destinataire,
-          String? message,
-          String? messageId,
-          int? jobId,
+          Value<String?> number = const Value.absent(),
+          Value<String?> message = const Value.absent(),
+          Value<String?> messageId = const Value.absent(),
+          Value<int?> jobId = const Value.absent(),
           Value<DateTime?> retrieveDate = const Value.absent(),
           Value<DateTime?> sentDate = const Value.absent(),
           Value<DateTime?> deliveredDate = const Value.absent()}) =>
       Message(
         id: id ?? this.id,
-        destinataire: destinataire ?? this.destinataire,
-        message: message ?? this.message,
-        messageId: messageId ?? this.messageId,
-        jobId: jobId ?? this.jobId,
+        number: number.present ? number.value : this.number,
+        message: message.present ? message.value : this.message,
+        messageId: messageId.present ? messageId.value : this.messageId,
+        jobId: jobId.present ? jobId.value : this.jobId,
         retrieveDate:
             retrieveDate.present ? retrieveDate.value : this.retrieveDate,
         sentDate: sentDate.present ? sentDate.value : this.sentDate,
@@ -268,9 +271,7 @@ class Message extends DataClass implements Insertable<Message> {
   Message copyWithCompanion(MessagesCompanion data) {
     return Message(
       id: data.id.present ? data.id.value : this.id,
-      destinataire: data.destinataire.present
-          ? data.destinataire.value
-          : this.destinataire,
+      number: data.number.present ? data.number.value : this.number,
       message: data.message.present ? data.message.value : this.message,
       messageId: data.messageId.present ? data.messageId.value : this.messageId,
       jobId: data.jobId.present ? data.jobId.value : this.jobId,
@@ -288,7 +289,7 @@ class Message extends DataClass implements Insertable<Message> {
   String toString() {
     return (StringBuffer('Message(')
           ..write('id: $id, ')
-          ..write('destinataire: $destinataire, ')
+          ..write('number: $number, ')
           ..write('message: $message, ')
           ..write('messageId: $messageId, ')
           ..write('jobId: $jobId, ')
@@ -300,14 +301,14 @@ class Message extends DataClass implements Insertable<Message> {
   }
 
   @override
-  int get hashCode => Object.hash(id, destinataire, message, messageId, jobId,
+  int get hashCode => Object.hash(id, number, message, messageId, jobId,
       retrieveDate, sentDate, deliveredDate);
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
       (other is Message &&
           other.id == this.id &&
-          other.destinataire == this.destinataire &&
+          other.number == this.number &&
           other.message == this.message &&
           other.messageId == this.messageId &&
           other.jobId == this.jobId &&
@@ -318,16 +319,16 @@ class Message extends DataClass implements Insertable<Message> {
 
 class MessagesCompanion extends UpdateCompanion<Message> {
   final Value<int> id;
-  final Value<String> destinataire;
-  final Value<String> message;
-  final Value<String> messageId;
-  final Value<int> jobId;
+  final Value<String?> number;
+  final Value<String?> message;
+  final Value<String?> messageId;
+  final Value<int?> jobId;
   final Value<DateTime?> retrieveDate;
   final Value<DateTime?> sentDate;
   final Value<DateTime?> deliveredDate;
   const MessagesCompanion({
     this.id = const Value.absent(),
-    this.destinataire = const Value.absent(),
+    this.number = const Value.absent(),
     this.message = const Value.absent(),
     this.messageId = const Value.absent(),
     this.jobId = const Value.absent(),
@@ -337,20 +338,17 @@ class MessagesCompanion extends UpdateCompanion<Message> {
   });
   MessagesCompanion.insert({
     this.id = const Value.absent(),
-    required String destinataire,
-    required String message,
-    required String messageId,
-    required int jobId,
+    this.number = const Value.absent(),
+    this.message = const Value.absent(),
+    this.messageId = const Value.absent(),
+    this.jobId = const Value.absent(),
     this.retrieveDate = const Value.absent(),
     this.sentDate = const Value.absent(),
     this.deliveredDate = const Value.absent(),
-  })  : destinataire = Value(destinataire),
-        message = Value(message),
-        messageId = Value(messageId),
-        jobId = Value(jobId);
+  });
   static Insertable<Message> custom({
     Expression<int>? id,
-    Expression<String>? destinataire,
+    Expression<String>? number,
     Expression<String>? message,
     Expression<String>? messageId,
     Expression<int>? jobId,
@@ -360,7 +358,7 @@ class MessagesCompanion extends UpdateCompanion<Message> {
   }) {
     return RawValuesInsertable({
       if (id != null) 'id': id,
-      if (destinataire != null) 'destinataire': destinataire,
+      if (number != null) 'number': number,
       if (message != null) 'message': message,
       if (messageId != null) 'message_id': messageId,
       if (jobId != null) 'job_id': jobId,
@@ -372,16 +370,16 @@ class MessagesCompanion extends UpdateCompanion<Message> {
 
   MessagesCompanion copyWith(
       {Value<int>? id,
-      Value<String>? destinataire,
-      Value<String>? message,
-      Value<String>? messageId,
-      Value<int>? jobId,
+      Value<String?>? number,
+      Value<String?>? message,
+      Value<String?>? messageId,
+      Value<int?>? jobId,
       Value<DateTime?>? retrieveDate,
       Value<DateTime?>? sentDate,
       Value<DateTime?>? deliveredDate}) {
     return MessagesCompanion(
       id: id ?? this.id,
-      destinataire: destinataire ?? this.destinataire,
+      number: number ?? this.number,
       message: message ?? this.message,
       messageId: messageId ?? this.messageId,
       jobId: jobId ?? this.jobId,
@@ -397,8 +395,8 @@ class MessagesCompanion extends UpdateCompanion<Message> {
     if (id.present) {
       map['id'] = Variable<int>(id.value);
     }
-    if (destinataire.present) {
-      map['destinataire'] = Variable<String>(destinataire.value);
+    if (number.present) {
+      map['number'] = Variable<String>(number.value);
     }
     if (message.present) {
       map['message'] = Variable<String>(message.value);
@@ -425,7 +423,7 @@ class MessagesCompanion extends UpdateCompanion<Message> {
   String toString() {
     return (StringBuffer('MessagesCompanion(')
           ..write('id: $id, ')
-          ..write('destinataire: $destinataire, ')
+          ..write('number: $number, ')
           ..write('message: $message, ')
           ..write('messageId: $messageId, ')
           ..write('jobId: $jobId, ')
@@ -450,20 +448,20 @@ abstract class _$AppDatabase extends GeneratedDatabase {
 
 typedef $$MessagesTableCreateCompanionBuilder = MessagesCompanion Function({
   Value<int> id,
-  required String destinataire,
-  required String message,
-  required String messageId,
-  required int jobId,
+  Value<String?> number,
+  Value<String?> message,
+  Value<String?> messageId,
+  Value<int?> jobId,
   Value<DateTime?> retrieveDate,
   Value<DateTime?> sentDate,
   Value<DateTime?> deliveredDate,
 });
 typedef $$MessagesTableUpdateCompanionBuilder = MessagesCompanion Function({
   Value<int> id,
-  Value<String> destinataire,
-  Value<String> message,
-  Value<String> messageId,
-  Value<int> jobId,
+  Value<String?> number,
+  Value<String?> message,
+  Value<String?> messageId,
+  Value<int?> jobId,
   Value<DateTime?> retrieveDate,
   Value<DateTime?> sentDate,
   Value<DateTime?> deliveredDate,
@@ -481,8 +479,8 @@ class $$MessagesTableFilterComposer
   ColumnFilters<int> get id => $composableBuilder(
       column: $table.id, builder: (column) => ColumnFilters(column));
 
-  ColumnFilters<String> get destinataire => $composableBuilder(
-      column: $table.destinataire, builder: (column) => ColumnFilters(column));
+  ColumnFilters<String> get number => $composableBuilder(
+      column: $table.number, builder: (column) => ColumnFilters(column));
 
   ColumnFilters<String> get message => $composableBuilder(
       column: $table.message, builder: (column) => ColumnFilters(column));
@@ -515,9 +513,8 @@ class $$MessagesTableOrderingComposer
   ColumnOrderings<int> get id => $composableBuilder(
       column: $table.id, builder: (column) => ColumnOrderings(column));
 
-  ColumnOrderings<String> get destinataire => $composableBuilder(
-      column: $table.destinataire,
-      builder: (column) => ColumnOrderings(column));
+  ColumnOrderings<String> get number => $composableBuilder(
+      column: $table.number, builder: (column) => ColumnOrderings(column));
 
   ColumnOrderings<String> get message => $composableBuilder(
       column: $table.message, builder: (column) => ColumnOrderings(column));
@@ -552,8 +549,8 @@ class $$MessagesTableAnnotationComposer
   GeneratedColumn<int> get id =>
       $composableBuilder(column: $table.id, builder: (column) => column);
 
-  GeneratedColumn<String> get destinataire => $composableBuilder(
-      column: $table.destinataire, builder: (column) => column);
+  GeneratedColumn<String> get number =>
+      $composableBuilder(column: $table.number, builder: (column) => column);
 
   GeneratedColumn<String> get message =>
       $composableBuilder(column: $table.message, builder: (column) => column);
@@ -598,17 +595,17 @@ class $$MessagesTableTableManager extends RootTableManager<
               $$MessagesTableAnnotationComposer($db: db, $table: table),
           updateCompanionCallback: ({
             Value<int> id = const Value.absent(),
-            Value<String> destinataire = const Value.absent(),
-            Value<String> message = const Value.absent(),
-            Value<String> messageId = const Value.absent(),
-            Value<int> jobId = const Value.absent(),
+            Value<String?> number = const Value.absent(),
+            Value<String?> message = const Value.absent(),
+            Value<String?> messageId = const Value.absent(),
+            Value<int?> jobId = const Value.absent(),
             Value<DateTime?> retrieveDate = const Value.absent(),
             Value<DateTime?> sentDate = const Value.absent(),
             Value<DateTime?> deliveredDate = const Value.absent(),
           }) =>
               MessagesCompanion(
             id: id,
-            destinataire: destinataire,
+            number: number,
             message: message,
             messageId: messageId,
             jobId: jobId,
@@ -618,17 +615,17 @@ class $$MessagesTableTableManager extends RootTableManager<
           ),
           createCompanionCallback: ({
             Value<int> id = const Value.absent(),
-            required String destinataire,
-            required String message,
-            required String messageId,
-            required int jobId,
+            Value<String?> number = const Value.absent(),
+            Value<String?> message = const Value.absent(),
+            Value<String?> messageId = const Value.absent(),
+            Value<int?> jobId = const Value.absent(),
             Value<DateTime?> retrieveDate = const Value.absent(),
             Value<DateTime?> sentDate = const Value.absent(),
             Value<DateTime?> deliveredDate = const Value.absent(),
           }) =>
               MessagesCompanion.insert(
             id: id,
-            destinataire: destinataire,
+            number: number,
             message: message,
             messageId: messageId,
             jobId: jobId,
