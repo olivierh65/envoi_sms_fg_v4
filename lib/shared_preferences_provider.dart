@@ -1,0 +1,48 @@
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+
+// Define a StateNotifier to manage the shared preferences
+class SharedPreferencesNotifier extends StateNotifier<Map<String, dynamic>> {
+  SharedPreferencesNotifier() : super({});
+
+  Future<void> loadPreferences() async {
+    final prefs = await SharedPreferences.getInstance();
+    final keys = prefs.getKeys();
+    final data = <String, dynamic>{};
+
+    for (final key in keys) {
+      data[key] = prefs.get(key);
+    }
+
+    state = data; // Update the state with all preferences
+  }
+
+  Future<void> updatePreference(String key, dynamic value) async {
+    final prefs = await SharedPreferences.getInstance();
+
+    if (value is String) {
+      await prefs.setString(key, value);
+    } else if (value is int) {
+      await prefs.setInt(key, value);
+    } else if (value is double) {
+      await prefs.setDouble(key, value);
+    } else if (value is bool) {
+      await prefs.setBool(key, value);
+    } else if (value is List<String>) {
+      await prefs.setStringList(key, value);
+    }
+
+    state = {...state, key: value}; // Update the state
+  }
+
+  // Méthode pour lire une préférence
+  dynamic getPreference(String key) {
+    return state[key];
+  }
+}
+
+// Define the provider
+final sharedPreferencesProvider =
+StateNotifierProvider<SharedPreferencesNotifier, Map<String, dynamic>>(
+      (ref) => SharedPreferencesNotifier(),
+);
