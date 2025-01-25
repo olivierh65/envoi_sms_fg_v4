@@ -49,7 +49,7 @@ class AppDatabase extends _$AppDatabase {
     await close();
   }
 
-  Stream<List<Message>> __watchAllMessages() {
+  Stream<List<Message>> watchAllMessages() {
     return (select(messages)
           ..orderBy(
               [(t) => OrderingTerm(expression: t.id, mode: OrderingMode.desc)])
@@ -57,7 +57,7 @@ class AppDatabase extends _$AppDatabase {
         .watch();
   }
 
-  Stream<List<Message>> watchAllMessages() {
+  Stream<List<Message>> __watchAllMessages() {
     var data = customSelect(
       'SELECT id, job_id, retrieve_date, sent_date, delivered_date FROM messages ORDER BY date DESC',
       readsFrom: {messages}, // Table explicitement observée

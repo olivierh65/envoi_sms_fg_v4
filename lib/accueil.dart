@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_easyloading/flutter_easyloading.dart';
 import 'package:linear_timer/linear_timer.dart';
+import 'MessagesStreamBuilder.dart';
 import 'background_service.dart';
 import 'main.dart';
 import 'package:flutter_background_service/flutter_background_service.dart';
@@ -201,58 +202,8 @@ class _AccueilState extends State<Accueil> with TickerProviderStateMixin {
                   ),
                 ),
                 child: Center(
-                  child: StreamBuilder<List<Message>>(
-                    stream: myDataStream,
-                    // initialData: const [],
-                    builder: (context, snapshot) {
-                      if (snapshot.connectionState == ConnectionState.waiting && snapshot.data == null) {
-                        return const Center(child: CircularProgressIndicator());
-                      }
-                      if (snapshot.hasError) {
-                        return Text('Error: ${snapshot.error}');
-                      }
-                      if (!snapshot.hasData || snapshot.data!.isEmpty) {
-                        return const Center(
-                            child: Text("Aucune donnée disponible"));
-                      }
-                      final messages = snapshot.data ??
-                          []; // snapshot.data ne sera jamais null
-                      if (messages.isEmpty &&
-                          snapshot.connectionState == ConnectionState.done) {
-                        return const Center(child: Text("Aucun message"));
-                      }
-                      return Scrollbar(
-                        controller: _scrollController,
-                        thumbVisibility:
-                            true, // Pour afficher la scrollbar en permanence
-                        child: ListView.builder(
-                          controller: _scrollController, // Associer le même ScrollController au ListView
-                          itemCount: messages.length,
-                          itemBuilder: (context, index) {
-                            final message = messages[index];
-                            late final icon;
-                            if (message.sentDate == null) {
-                              icon = getStatusIcon('waiting');
-                            } else if (message.sentDate != null &&
-                                message.deliveredDate == null) {
-                              icon = getStatusIcon('sending');
-                            } else if (message.sentDate != null &&
-                                message.deliveredDate != null) {
-                              icon = getStatusIcon('delivered');
-                            } else {
-                              icon = getStatusIcon('other');
-                            }
-                            return ListTile(
-                              leading: icon, // Icône en début de ligne
-                              title: Text(message.number ?? 'xx'),
-                              subtitle: Text(message.message! ?? '....',
-                                  overflow: TextOverflow.ellipsis),
-                              trailing: Text(message.messageId! ?? 'yy'),
-                            );
-                          },
-                        ),
-                      );
-                    },
+                  child: MessagesStreamBuilder(
+                    stream: myDataStream, // Passer le Stream
                   ),
                 ),
               ),
