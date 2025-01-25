@@ -5,8 +5,6 @@ import 'background_service.dart';
 import 'main.dart';
 import 'package:flutter_background_service/flutter_background_service.dart';
 import 'database.dart'; // Import pour la classe Message
-import 'package:talker_flutter/talker_flutter.dart';
-import 'package:provider/provider.dart';
 
 class Accueil extends StatefulWidget {
   const Accueil({super.key, required this.title, required this.args});
@@ -19,7 +17,6 @@ class Accueil extends StatefulWidget {
 }
 
 class _AccueilState extends State<Accueil> with TickerProviderStateMixin {
-  late AppDatabase _database;
   late BackgroundServiceManager _backgroundServiceManager;
   String currentTime = "Pas encore reçu";
 
@@ -28,10 +25,6 @@ class _AccueilState extends State<Accueil> with TickerProviderStateMixin {
   late LinearTimerController timerController = LinearTimerController(this);
   late final Stream<List<Message>> myDataStream;
   final ScrollController _scrollController = ScrollController();
-  late final Stream<List<Message>> _messageStream; // Variable d'instance pour le Stream
-
-  final GlobalKey _streamBuilderKey = GlobalKey();
-  int _streamKey = 0; // Variable pour changer la key du StreamBuilder
 
 
   @override
@@ -47,10 +40,6 @@ class _AccueilState extends State<Accueil> with TickerProviderStateMixin {
         widget.args.backgroundService!; // Assuming args is non-nullable
 
     // Créer le Stream Drift une seule fois
-    _messageStream = _backgroundServiceManager.messageStream;
-
-    // Assigner le callback
-    _backgroundServiceManager.rebuildStreamBuilderCallback = _rebuildStreamBuilder;
 
     _initBackgroundService(); // Appel pour enregistrer les écouteurs
   }
@@ -212,8 +201,7 @@ class _AccueilState extends State<Accueil> with TickerProviderStateMixin {
                 ),
                 child: Center(
                   child: StreamBuilder<List<Message>>(
-                    key: ValueKey(_streamKey), // Utiliser une key unique
-                    stream: messageStreamNotifier.value,
+                    stream: _backgroundServiceManager.messageStream, // Utiliser le Stream de BackgroundServiceManager
                     // initialData: const [],
                     builder: (context, snapshot) {
                       if (snapshot.connectionState == ConnectionState.waiting && snapshot.data == null) {
@@ -280,7 +268,7 @@ class _AccueilState extends State<Accueil> with TickerProviderStateMixin {
         /* Navigator.of(context).push(MaterialPageRoute(
           builder: (context) => TalkerScreen(talker: globals.Logger),*/
         Navigator.pushNamed(context, "/logs",
-            arguments: widget.args?['Logger']);
+            arguments: widget.args['Logger']);
         break;
       case 'Settings':
         Navigator.pushNamed(context, '/settings', arguments: widget.args);
@@ -312,9 +300,4 @@ class _AccueilState extends State<Accueil> with TickerProviderStateMixin {
     }
   }
   // Méthode pour forcer la reconstruction du StreamBuilder
-  void _rebuildStreamBuilder() {
-    setState(() {
-      _streamKey++; // Changer la valeur de la key
-    });
-  }
 }

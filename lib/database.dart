@@ -7,7 +7,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:flutter/foundation.dart';
 
 import 'background_service.dart';
-import 'main.dart'; // Import pour ValueNotifier
+// Import pour ValueNotifier
 
 part 'database.g.dart';
 
@@ -33,9 +33,11 @@ class Messages extends Table {
 
 @DriftDatabase(tables: [Messages])
 class AppDatabase extends _$AppDatabase {
-  final BackgroundServiceManager _backgroundServiceManager; // Ajouter une variable d'instance
+  late final BackgroundServiceManager _backgroundServiceManager; // Ajouter une variable d'instance
 
-  AppDatabase(this._backgroundServiceManager) : super(_openConnection());
+  AppDatabase() : super(_openConnection()) {
+    _backgroundServiceManager = BackgroundServiceManager(); // Initialiser la variable d'instance
+  }
 
 
   static LazyDatabase _openConnection() {
@@ -46,11 +48,9 @@ class AppDatabase extends _$AppDatabase {
     });
   }
 
-  // Méthode pour notifier les changements
-  void notifyChanges() {
-    messageStreamNotifier.value = watchAllMessage(); // Recréer le Stream Drift
-    // Appeler le callback
-    _backgroundServiceManager.rebuildStreamBuilderCallback?.call();
+  void _updateMessageStream() async {
+    final messages = await getAllMessages(); // Récupérer les messages de la base
+    _backgroundServiceManager.messageStreamController.add(messages); // Mettre à jour le StreamController
   }
 
   // Ajouter une méthode pour fermer la base
@@ -61,8 +61,8 @@ class AppDatabase extends _$AppDatabase {
 
   // Définition de la méthode watchAllSms()
   Stream<List<Message>> watchAllMessage() {
-    // return select(messages).watch();
-    return (select(messages)..orderBy([(t) => OrderingTerm(expression: t.id)])).watch();
+    return select(messages).watch();
+    // return (select(messages)..orderBy([(t) => OrderingTerm(expression: t.id)])).watch();
   }
 
   @override
@@ -70,7 +70,7 @@ class AppDatabase extends _$AppDatabase {
 
   Future<int> insertMessage(MessagesCompanion message) async {
     final result = into(messages).insert(message);
-    notifyChanges();
+    _updateMessageStream(); // Mettre à jour le StreamController
     return result;
   }
 
@@ -80,7 +80,7 @@ class AppDatabase extends _$AppDatabase {
 
     final result =  (update(messages)..where((tbl) => tbl.id.equals(id)))
         .write(updatedMessage);
-    notifyChanges();
+    _updateMessageStream(); // Mettre à jour le StreamController
     return result;
   }
 
@@ -101,7 +101,7 @@ class AppDatabase extends _$AppDatabase {
     if (jobId != null) {
       updt.where((tbl) => tbl.jobId.equals(jobId));
     }
-    notifyChanges();
+    _updateMessageStream(); // Mettre à jour le StreamController
 
     return updt.write(updatedMessage);
   }

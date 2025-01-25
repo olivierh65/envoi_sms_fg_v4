@@ -12,29 +12,35 @@ class BackgroundServiceManager {
   late final AppDatabase _database;
   late final Traitement _traitement;
 
-  BackgroundServiceManager() {
-    _database = AppDatabase(this);
-    _traitement = Traitement(_database, this);
+  static final BackgroundServiceManager _instance = BackgroundServiceManager._internal(); // Instance privée
+
+  factory BackgroundServiceManager() {
+    return _instance; // Retourner l'instance unique
   }
+
+  BackgroundServiceManager._internal() {
+    _database = AppDatabase();
+    _traitement = Traitement();
+  }
+
+  AppDatabase get database => _database;
 
   Traitement get traitement => _traitement;
 
-  // Callback pour forcer la reconstruction du StreamBuilder
-  VoidCallback? rebuildStreamBuilderCallback;
+  final _messageStreamController = StreamController<List<Message>>.broadcast();
 
-  // Stream<List<Message>> get messageStream  => _database.watchAllMessage();
-  Stream<List<Message>> get messageStream {
-    print('Accès au flux messageStream');
-    return _database.watchAllMessage();
-  }
+  get messageStreamController => _messageStreamController;
+
+  Stream<List<Message>> get messageStream => _messageStreamController.stream;
 
   bool isRunning = false;
   get dataStream => null;
 
   Future<void> initialize() async {
-    await _service.configure(
+    final service = FlutterBackgroundService();
+    await service.configure(
       androidConfiguration: AndroidConfiguration(
-        onStart: onStart, // Fonction qui sera appelée pour démarrer le service
+        onStart: onStart,
         isForegroundMode: true,
         autoStart: false,
         notificationChannelId: 'my_foreground_channel',
@@ -43,7 +49,7 @@ class BackgroundServiceManager {
       ),
       iosConfiguration: IosConfiguration(
         autoStart: false,
-        onForeground: onStart,
+        // onForeground: onStart,
         onBackground: onIosBackground,
       ),
     );
@@ -56,8 +62,9 @@ class BackgroundServiceManager {
   static void onStart(ServiceInstance service) async {
     DartPluginRegistrant.ensureInitialized();
     final prefs = await SharedPreferences.getInstance();
-    //Récupération de l'instance du BackgroundServiceManager
+    // Accéder à l'instance unique via BackgroundServiceManager()
     final backgroundServiceManager = BackgroundServiceManager();
+
 
     final completer = Completer<void>();
     backgroundServiceManager._traitement.completer = completer;

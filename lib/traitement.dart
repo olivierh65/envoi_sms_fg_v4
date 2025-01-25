@@ -13,13 +13,11 @@ class Traitement {
   Completer<void>? completer;
   static bool _isPaused  = false;
   late StreamController<void> _pauseController;
-  late AppDatabase _database; // Base Drift injectée
   late BackgroundServiceManager _backgroundServiceManager;
 
-  Traitement (database, BackgroundServiceManager backgroundServiceManager, {bool paused = true}) {
+  Traitement ( {bool paused = true}) {
     _isPaused = paused;
-    _database = database;
-    _backgroundServiceManager = backgroundServiceManager;
+    _backgroundServiceManager = BackgroundServiceManager();
     _pauseController = StreamController<void>.broadcast();
   }
 
@@ -48,7 +46,7 @@ class Traitement {
     print("Entree doWork");
 
     await _checkPause();
-    _traiteCache(service, prefs);
+    await _traiteCache(service, prefs);
     await _checkPause();
 
     service.invoke('querydb', {'show': 'Query DB ...'});
@@ -62,8 +60,8 @@ class Traitement {
 
       for (var item in jsonData) {
         try {
-          if (await _database.isMessageExist(item['messageId'], item['jobId']) == 0) {
-            await _database.insertMessage(
+          if (await _backgroundServiceManager.database.isMessageExist(item['messageId'], item['jobId']) == 0) {
+            await _backgroundServiceManager.database.insertMessage(
               MessagesCompanion(
                 number: Value(item['number']),
                 message: Value(item['message']),
@@ -85,7 +83,7 @@ class Traitement {
   }
 
   Future<void> _traiteCache(ServiceInstance service, SharedPreferences prefs) async {
-    final List<Message> messages = await _database.getMessagesNotSent();
+    final List<Message> messages = await _backgroundServiceManager.database.getMessagesNotSent();
 
     print("requete terminee");
 
@@ -94,7 +92,7 @@ class Traitement {
       print("envoi de ${message.id}");
       await Future.delayed(const Duration(seconds: 2));
       print("Envoyé");
-      await _database.updateMessageSent(
+      await _backgroundServiceManager.database.updateMessageSent(
         message.id,
         message.jobId,
       );
@@ -153,7 +151,7 @@ class Traitement {
 
   // Méthode pour nettoyer les ressources
   Future<void> dispose() async {
-    await _database.close();
+    await _backgroundServiceManager.database.close();
     _pauseController.close(); // Fermer aussi _pauseController
   }
 }
