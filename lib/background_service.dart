@@ -19,8 +19,8 @@ class BackgroundServiceManager {
   }
 
   BackgroundServiceManager._internal() {
-    _database = AppDatabase();
-    _traitement = Traitement();
+    _database = AppDatabase(this);
+    _traitement = Traitement(this);
   }
 
   AppDatabase get database => _database;

@@ -15,9 +15,9 @@ class Traitement {
   late StreamController<void> _pauseController;
   late BackgroundServiceManager _backgroundServiceManager;
 
-  Traitement ( {bool paused = true}) {
+  Traitement (BackgroundServiceManager backgroundServiceManager, {bool paused = true}) {
     _isPaused = paused;
-    _backgroundServiceManager = BackgroundServiceManager();
+    _backgroundServiceManager = backgroundServiceManager;
     _pauseController = StreamController<void>.broadcast();
   }
 

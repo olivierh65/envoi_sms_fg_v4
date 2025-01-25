@@ -35,10 +35,7 @@ class Messages extends Table {
 class AppDatabase extends _$AppDatabase {
   late final BackgroundServiceManager _backgroundServiceManager; // Ajouter une variable d'instance
 
-  AppDatabase() : super(_openConnection()) {
-    _backgroundServiceManager = BackgroundServiceManager(); // Initialiser la variable d'instance
-  }
-
+  AppDatabase(this._backgroundServiceManager) : super(_openConnection()) ;
 
   static LazyDatabase _openConnection() {
     return LazyDatabase(() async {
