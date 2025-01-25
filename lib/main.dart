@@ -11,6 +11,7 @@ import 'background_service.dart';
 import 'database.dart';
 import 'traitement.dart';
 
+
 void main() async {
 
   // Initialiser le logger
@@ -82,6 +83,9 @@ class MyApp extends ConsumerWidget {
 
   const MyApp({required this.args, super.key});
 
+  // Définir la propriété navigatorKey
+  static final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
+
   // This widget is the root of your application.
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -92,6 +96,7 @@ class MyApp extends ConsumerWidget {
         title: 'Flutter Demo',
         builder: EasyLoading.init(),
         debugShowCheckedModeBanner: false,
+        navigatorKey: navigatorKey,
         theme: ThemeData(
           colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
           useMaterial3: true,

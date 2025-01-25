@@ -11,16 +11,23 @@ class BackgroundServiceManager {
   static Timer? _timer;
   late final AppDatabase _database;
   late final Traitement _traitement;
-  final StreamController<List<Message>> _smsStreamController = StreamController<List<Message>>.broadcast();
 
   BackgroundServiceManager() {
-    _database = AppDatabase();
-    _traitement = Traitement(_database);
+    _database = AppDatabase(this);
+    _traitement = Traitement(_database, this);
   }
 
   Traitement get traitement => _traitement;
 
-  Stream<List<Message>> get smsStream => _database.watchAllMessage();
+  // Callback pour forcer la reconstruction du StreamBuilder
+  VoidCallback? rebuildStreamBuilderCallback;
+
+  // Stream<List<Message>> get messageStream  => _database.watchAllMessage();
+  Stream<List<Message>> get messageStream {
+    print('Accès au flux messageStream');
+    return _database.watchAllMessage();
+  }
+
   bool isRunning = false;
   get dataStream => null;
 
@@ -43,6 +50,7 @@ class BackgroundServiceManager {
     // Démarre le service
     await _service.startService();
   }
+
 
   // Fonction qui sera exécutée lorsque le service démarre
   static void onStart(ServiceInstance service) async {
@@ -102,7 +110,6 @@ class BackgroundServiceManager {
       service.invoke('update', {
         "current_time": DateTime.now().toIso8601String(),
       });
-      traitement.doWork(service, await SharedPreferences.getInstance());
     });
   }
   static void _stopTimer() {
@@ -131,7 +138,6 @@ class BackgroundServiceManager {
   }
 
   void dispose() {
-    _smsStreamController.close();
     _database.close();
   }
 

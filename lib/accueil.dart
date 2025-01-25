@@ -5,8 +5,8 @@ import 'background_service.dart';
 import 'main.dart';
 import 'package:flutter_background_service/flutter_background_service.dart';
 import 'database.dart'; // Import pour la classe Message
-import 'traitement.dart';
 import 'package:talker_flutter/talker_flutter.dart';
+import 'package:provider/provider.dart';
 
 class Accueil extends StatefulWidget {
   const Accueil({super.key, required this.title, required this.args});
@@ -26,6 +26,13 @@ class _AccueilState extends State<Accueil> with TickerProviderStateMixin {
   bool light = false;
 
   late LinearTimerController timerController = LinearTimerController(this);
+  late final Stream<List<Message>> myDataStream;
+  final ScrollController _scrollController = ScrollController();
+  late final Stream<List<Message>> _messageStream; // Variable d'instance pour le Stream
+
+  final GlobalKey _streamBuilderKey = GlobalKey();
+  int _streamKey = 0; // Variable pour changer la key du StreamBuilder
+
 
   @override
   void initState() {
@@ -35,8 +42,16 @@ class _AccueilState extends State<Accueil> with TickerProviderStateMixin {
           "Erreur: backgroundService est null (ceci ne devrait pas arriver si l'initialisation dans main.dart est correcte)");
       return; // Très important de retourner ici pour éviter l'erreur
     }
+
     _backgroundServiceManager =
         widget.args.backgroundService!; // Assuming args is non-nullable
+
+    // Créer le Stream Drift une seule fois
+    _messageStream = _backgroundServiceManager.messageStream;
+
+    // Assigner le callback
+    _backgroundServiceManager.rebuildStreamBuilderCallback = _rebuildStreamBuilder;
+
     _initBackgroundService(); // Appel pour enregistrer les écouteurs
   }
 
@@ -58,14 +73,27 @@ class _AccueilState extends State<Accueil> with TickerProviderStateMixin {
         EasyLoading.dismiss();
       }
     });
+
+    widget.args.backgroundService!.messageStream.listen(
+      (List<Message> messages) {
+        print('Nouvelles données du Stream : $messages');
+        for (var message in messages) {
+          print(
+              "Message number : ${message.number}, message : ${message.message}");
+        }
+      },
+      onError: (error) {
+        print('Erreur dans le Stream : $error');
+      },
+      onDone: () {
+        print('Stream terminé.');
+      },
+    );
   }
 
   @override
   void dispose() {
-    _backgroundServiceManager.dispose();
-
     timerController.dispose();
-
     super.dispose();
   }
 
@@ -184,9 +212,11 @@ class _AccueilState extends State<Accueil> with TickerProviderStateMixin {
                 ),
                 child: Center(
                   child: StreamBuilder<List<Message>>(
-                    stream: widget.args.backgroundService!.traitement.messageStream,
+                    key: ValueKey(_streamKey), // Utiliser une key unique
+                    stream: messageStreamNotifier.value,
+                    // initialData: const [],
                     builder: (context, snapshot) {
-                      if (snapshot.connectionState == ConnectionState.waiting) {
+                      if (snapshot.connectionState == ConnectionState.waiting && snapshot.data == null) {
                         return const Center(child: CircularProgressIndicator());
                       }
                       if (snapshot.hasError) {
@@ -196,17 +226,42 @@ class _AccueilState extends State<Accueil> with TickerProviderStateMixin {
                         return const Center(
                             child: Text("Aucune donnée disponible"));
                       }
-                      final messages = snapshot.data!;
-                      return ListView.builder(
-                        itemCount: messages.length,
-                        itemBuilder: (context, index) {
-                          final message = messages[index];
-                          return ListTile(
-                            title: Text(message.number ?? 'xx'),
-                            subtitle: Text(message.message! ?? '....'),
-                            trailing: Text(message.messageId! ?? 'yy'),
-                          );
-                        },
+                      final messages = snapshot.data ??
+                          []; // snapshot.data ne sera jamais null
+                      if (messages.isEmpty &&
+                          snapshot.connectionState == ConnectionState.done) {
+                        return const Center(child: Text("Aucun message"));
+                      }
+                      return Scrollbar(
+                        controller: _scrollController,
+                        thumbVisibility:
+                            true, // Pour afficher la scrollbar en permanence
+                        child: ListView.builder(
+                          controller: _scrollController, // Associer le même ScrollController au ListView
+                          itemCount: messages.length,
+                          itemBuilder: (context, index) {
+                            final message = messages[index];
+                            late final icon;
+                            if (message.sentDate == null) {
+                              icon = getStatusIcon('waiting');
+                            } else if (message.sentDate != null &&
+                                message.deliveredDate == null) {
+                              icon = getStatusIcon('sending');
+                            } else if (message.sentDate != null &&
+                                message.deliveredDate != null) {
+                              icon = getStatusIcon('delivered');
+                            } else {
+                              icon = getStatusIcon('other');
+                            }
+                            return ListTile(
+                              leading: icon, // Icône en début de ligne
+                              title: Text(message.number ?? 'xx'),
+                              subtitle: Text(message.message! ?? '....',
+                                  overflow: TextOverflow.ellipsis),
+                              trailing: Text(message.messageId! ?? 'yy'),
+                            );
+                          },
+                        ),
                       );
                     },
                   ),
@@ -233,7 +288,33 @@ class _AccueilState extends State<Accueil> with TickerProviderStateMixin {
     }
   }
 
+
   updateTimer(var a) {
     a.timerController.value;
+  }
+
+  Icon getStatusIcon(String status) {
+    switch (status) {
+      case "waiting":
+        return Icon(Icons.access_time, color: Colors.grey);
+      case "in_progress":
+        return Icon(Icons.autorenew, color: Colors.blue); // Icône de chargement
+      case "sending":
+        return Icon(Icons.send, color: Colors.blue);
+      case "delivering":
+        return Icon(Icons.delivery_dining, color: Colors.blue);
+      case "delivered":
+        return Icon(Icons.check_circle, color: Colors.green);
+      case "failed":
+        return Icon(Icons.error, color: Colors.red);
+      default:
+        return Icon(Icons.help_outline, color: Colors.grey);
+    }
+  }
+  // Méthode pour forcer la reconstruction du StreamBuilder
+  void _rebuildStreamBuilder() {
+    setState(() {
+      _streamKey++; // Changer la valeur de la key
+    });
   }
 }

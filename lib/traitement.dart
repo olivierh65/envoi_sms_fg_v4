@@ -5,6 +5,7 @@ import 'package:flutter_background_service/flutter_background_service.dart';
 import 'package:http/http.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:drift/drift.dart';
+import 'background_service.dart';
 import 'database.dart'; // fichier Drift
 
 class Traitement {
@@ -13,15 +14,16 @@ class Traitement {
   static bool _isPaused  = false;
   late StreamController<void> _pauseController;
   late AppDatabase _database; // Base Drift injectée
-  final StreamController<List<Message>> _streamController = StreamController.broadcast();
+  late BackgroundServiceManager _backgroundServiceManager;
 
-  Traitement (database, {bool paused = true}) {
+  Traitement (database, BackgroundServiceManager backgroundServiceManager, {bool paused = true}) {
     _isPaused = paused;
     _database = database;
+    _backgroundServiceManager = backgroundServiceManager;
     _pauseController = StreamController<void>.broadcast();
   }
 
-  Stream<List<Message>> get messageStream => _streamController.stream;
+  Stream<List<Message>> get messageStream => _backgroundServiceManager.messageStream;
 
   Future<void> loadState() async {
     // Simule la récupération de l'état sauvegardé
@@ -46,6 +48,8 @@ class Traitement {
     print("Entree doWork");
 
     await _checkPause();
+    _traiteCache(service, prefs);
+    await _checkPause();
 
     service.invoke('querydb', {'show': 'Query DB ...'});
     Response? resp = await _getList(prefs);
@@ -58,20 +62,21 @@ class Traitement {
 
       for (var item in jsonData) {
         try {
-          await _database.insertMessage(
-            MessagesCompanion(
-              number: Value(item['number']),
-              message: Value(item['message']),
-              messageId: Value(item['messageId']),
-              jobId: Value(item['jobId']),
-              retrieveDate: Value(DateTime.now()),
-            ),
-          );
+          if (await _database.isMessageExist(item['messageId'], item['jobId']) == 0) {
+            await _database.insertMessage(
+              MessagesCompanion(
+                number: Value(item['number']),
+                message: Value(item['message']),
+                messageId: Value(item['messageId']),
+                jobId: Value(item['jobId']),
+                retrieveDate: Value(DateTime.now()),
+              ),
+            );
+          }
         } catch (e) {
           print("Erreur lors de l'insertion du message : $e");
         }
       }
-      _updateMessageStream(); // Mettre à jour le stream après l'insertion
     }
 
     if (!completer!.isCompleted) {
@@ -79,9 +84,22 @@ class Traitement {
     }
   }
 
-  Future<void> _updateMessageStream() async {
-    final updatedMessages = await _database.getAllMessages();
-    _streamController.add(updatedMessages);
+  Future<void> _traiteCache(ServiceInstance service, SharedPreferences prefs) async {
+    final List<Message> messages = await _database.getMessagesNotSent();
+
+    print("requete terminee");
+
+    for (var message in messages) {
+      await _checkPause();
+      print("envoi de ${message.id}");
+      await Future.delayed(const Duration(seconds: 2));
+      print("Envoyé");
+      await _database.updateMessageSent(
+        message.id,
+        message.jobId,
+      );
+
+    }
   }
 
   Future<void> _checkPause() async {
@@ -136,7 +154,6 @@ class Traitement {
   // Méthode pour nettoyer les ressources
   Future<void> dispose() async {
     await _database.close();
-    _streamController.close();
     _pauseController.close(); // Fermer aussi _pauseController
   }
 }

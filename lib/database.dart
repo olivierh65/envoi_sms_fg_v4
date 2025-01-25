@@ -4,8 +4,15 @@ import 'package:drift/drift.dart';
 import 'package:drift/native.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
+import 'package:flutter/foundation.dart';
+
+import 'background_service.dart';
+import 'main.dart'; // Import pour ValueNotifier
 
 part 'database.g.dart';
+
+final ValueNotifier<Stream<List<Message>>> messageStreamNotifier =
+ValueNotifier<Stream<List<Message>>>(Stream.empty()); // Initialiser avec un Stream vide
 
 @DataClassName('Message')
 class Messages extends Table {
@@ -17,12 +24,19 @@ class Messages extends Table {
   DateTimeColumn get retrieveDate => dateTime().nullable()();
   DateTimeColumn get sentDate => dateTime().nullable()();
   DateTimeColumn get deliveredDate => dateTime().nullable()();
+
+  @override
+  List<String> get customConstraints => [
+        'UNIQUE(message_id, job_id)', // Contrainte d'unicité sur le couple
+      ];
 }
 
 @DriftDatabase(tables: [Messages])
 class AppDatabase extends _$AppDatabase {
+  final BackgroundServiceManager _backgroundServiceManager; // Ajouter une variable d'instance
 
-  AppDatabase() : super(_openConnection());
+  AppDatabase(this._backgroundServiceManager) : super(_openConnection());
+
 
   static LazyDatabase _openConnection() {
     return LazyDatabase(() async {
@@ -30,6 +44,13 @@ class AppDatabase extends _$AppDatabase {
       final file = File(p.join(dbFolder.path, 'db.sqlite'));
       return NativeDatabase(file);
     });
+  }
+
+  // Méthode pour notifier les changements
+  void notifyChanges() {
+    messageStreamNotifier.value = watchAllMessage(); // Recréer le Stream Drift
+    // Appeler le callback
+    _backgroundServiceManager.rebuildStreamBuilderCallback?.call();
   }
 
   // Ajouter une méthode pour fermer la base
@@ -40,31 +61,79 @@ class AppDatabase extends _$AppDatabase {
 
   // Définition de la méthode watchAllSms()
   Stream<List<Message>> watchAllMessage() {
-    return select(messages).watch();
+    // return select(messages).watch();
+    return (select(messages)..orderBy([(t) => OrderingTerm(expression: t.id)])).watch();
   }
 
   @override
-  int get schemaVersion => 2;
+  int get schemaVersion => 3;
 
-  Future<int> insertMessage(MessagesCompanion message) =>
-      into(messages).insert(message);
+  Future<int> insertMessage(MessagesCompanion message) async {
+    final result = into(messages).insert(message);
+    notifyChanges();
+    return result;
+  }
 
   Future<List<Message>> getAllMessages() => select(messages).get();
 
   Future<void> updateMessage(int id, MessagesCompanion updatedMessage) {
-    return (update(messages)..where((tbl) => tbl.id.equals(id))).write(updatedMessage);
+
+    final result =  (update(messages)..where((tbl) => tbl.id.equals(id)))
+        .write(updatedMessage);
+    notifyChanges();
+    return result;
+  }
+
+  Future<List<Message>> getMessagesNotSent() async {
+    final query = select(messages);
+    query.where((tbl) => tbl.sentDate.isNull());
+
+    final result = await query.get();
+    return result;
+  }
+
+  Future<void> updateMessageSent(int id, int? jobId) {
+    var updatedMessage = MessagesCompanion(
+      sentDate: Value(DateTime.now()),
+    );
+    final updt = update(messages);
+    updt.where((tbl) => tbl.id.equals(id));
+    if (jobId != null) {
+      updt.where((tbl) => tbl.jobId.equals(jobId));
+    }
+    notifyChanges();
+
+    return updt.write(updatedMessage);
+  }
+
+  Future<int> isMessageExist(String? messageId, int? jobId) async {
+    final query = select(messages);
+    if (messageId != null) {
+      query.where((tbl) => tbl.messageId.equals(messageId));
+    }
+    if (jobId != null) {
+      query.where((tbl) => tbl.jobId.equals(jobId));
+    }
+
+    final result = await query.get();
+    if (result.isEmpty) {
+      return 0; // Aucun message trouvé
+    } else {
+      return result.length;
+    }
   }
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
-    onCreate: (Migrator m) async {
-      await m.createAll(); // Créer toutes les tables
-    },
-    onUpgrade: (Migrator m, int from, int to) async {
-      if (from < 2) {
-        // Logique de migration de la version 1 à la version 2 (si nécessaire)
-        // Par exemple: await m.addColumn(messages, messages.nouvelleColonne);
-      }
-    },
-  );
+        onCreate: (Migrator m) async {
+          await m.createAll(); // Créer toutes les tables
+        },
+        onUpgrade: (Migrator m, int from, int to) async {
+          if (from <= 1 && to >= 2) {
+            // Logique de migration de la version 1 à la version 2 (si nécessaire)
+            // Par exemple: await m.addColumn(messages, messages.nouvelleColonne);
+            await m.createAll(); // Créer toutes les tables
+          }
+        },
+      );
 }
