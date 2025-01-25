@@ -12,6 +12,11 @@ class BackgroundServiceManager {
   late final AppDatabase _database;
   late final Traitement _traitement;
 
+  final _messageStreamController = StreamController<List<Message>>.broadcast();
+  get messageStreamController => _messageStreamController;
+  Stream<List<Message>> get messageStream => _messageStreamController.stream;
+
+
   static final BackgroundServiceManager _instance = BackgroundServiceManager._internal(); // Instance privée
 
   factory BackgroundServiceManager() {
@@ -27,11 +32,6 @@ class BackgroundServiceManager {
 
   Traitement get traitement => _traitement;
 
-  final _messageStreamController = StreamController<List<Message>>.broadcast();
-
-  get messageStreamController => _messageStreamController;
-
-  Stream<List<Message>> get messageStream => _messageStreamController.stream;
 
   bool isRunning = false;
   get dataStream => null;

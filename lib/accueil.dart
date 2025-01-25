@@ -25,7 +25,7 @@ class _AccueilState extends State<Accueil> with TickerProviderStateMixin {
   late LinearTimerController timerController = LinearTimerController(this);
   late final Stream<List<Message>> myDataStream;
   final ScrollController _scrollController = ScrollController();
-
+  late Stream<List<Message>> _messageStream;
 
   @override
   void initState() {
@@ -36,12 +36,13 @@ class _AccueilState extends State<Accueil> with TickerProviderStateMixin {
       return; // Très important de retourner ici pour éviter l'erreur
     }
 
-    _backgroundServiceManager =
-        widget.args.backgroundService!; // Assuming args is non-nullable
+    _backgroundServiceManager = BackgroundServiceManager(); // recupere le singleton
 
     // Créer le Stream Drift une seule fois
 
     _initBackgroundService(); // Appel pour enregistrer les écouteurs
+    _messageStream = BackgroundServiceManager().messageStream; // Récupérer le Stream
+
   }
 
   Future<void> _initBackgroundService() async {
@@ -63,6 +64,7 @@ class _AccueilState extends State<Accueil> with TickerProviderStateMixin {
       }
     });
 
+    /*
     widget.args.backgroundService!.messageStream.listen(
       (List<Message> messages) {
         print('Nouvelles données du Stream : $messages');
@@ -78,6 +80,7 @@ class _AccueilState extends State<Accueil> with TickerProviderStateMixin {
         print('Stream terminé.');
       },
     );
+     */
   }
 
   @override
@@ -201,7 +204,7 @@ class _AccueilState extends State<Accueil> with TickerProviderStateMixin {
                 ),
                 child: Center(
                   child: StreamBuilder<List<Message>>(
-                    stream: _backgroundServiceManager.messageStream, // Utiliser le Stream de BackgroundServiceManager
+                    stream: _messageStream,
                     // initialData: const [],
                     builder: (context, snapshot) {
                       if (snapshot.connectionState == ConnectionState.waiting && snapshot.data == null) {
