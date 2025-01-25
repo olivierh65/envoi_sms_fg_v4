@@ -21,8 +21,6 @@ class Traitement {
     _pauseController = StreamController<void>.broadcast();
   }
 
-  Stream<List<Message>> get messageStream => _backgroundServiceManager.messageStream;
-
   Future<void> loadState() async {
     // Simule la récupération de l'état sauvegardé
     print('État chargé : étape');

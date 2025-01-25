@@ -4,15 +4,12 @@ import 'package:drift/drift.dart';
 import 'package:drift/native.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
-import 'package:flutter/foundation.dart';
 
 import 'background_service.dart';
+
 // Import pour ValueNotifier
 
 part 'database.g.dart';
-
-final ValueNotifier<Stream<List<Message>>> messageStreamNotifier =
-ValueNotifier<Stream<List<Message>>>(Stream.empty()); // Initialiser avec un Stream vide
 
 @DataClassName('Message')
 class Messages extends Table {
@@ -33,9 +30,10 @@ class Messages extends Table {
 
 @DriftDatabase(tables: [Messages])
 class AppDatabase extends _$AppDatabase {
-  late final BackgroundServiceManager _backgroundServiceManager; // Ajouter une variable d'instance
 
-  AppDatabase(this._backgroundServiceManager) : super(_openConnection()) ;
+  AppDatabase(BackgroundServiceManager backgroundServiceManager)
+      : super(_openConnection()) {
+  }
 
   static LazyDatabase _openConnection() {
     return LazyDatabase(() async {
@@ -45,39 +43,52 @@ class AppDatabase extends _$AppDatabase {
     });
   }
 
-  void _updateMessageStream() async {
-    final messages = await getAllMessages(); // Récupérer les messages de la base
-    _backgroundServiceManager.messageStreamController.add(messages); // Mettre à jour le StreamController
-  }
-
   // Ajouter une méthode pour fermer la base
   @override
   Future<void> close() async {
     await close();
   }
 
-  // Définition de la méthode watchAllSms()
-  Stream<List<Message>> watchAllMessage() {
-    return select(messages).watch();
-    // return (select(messages)..orderBy([(t) => OrderingTerm(expression: t.id)])).watch();
+  Stream<List<Message>> __watchAllMessages() {
+    return (select(messages)
+          ..orderBy(
+              [(t) => OrderingTerm(expression: t.id, mode: OrderingMode.desc)])
+          ..get())
+        .watch();
   }
+
+  Stream<List<Message>> watchAllMessages() {
+    var data = customSelect(
+      'SELECT id, job_id, retrieve_date, sent_date, delivered_date FROM messages ORDER BY date DESC',
+      readsFrom: {messages}, // Table explicitement observée
+    ).watch().map((rows) {
+      return rows.map((row) {
+        return Message(
+          id: row.read<int>('id'),
+          jobId: row.read<int>('job_id'),
+          retrieveDate:  row.read<DateTime>('retrieve_date'),
+          sentDate: row.read<DateTime>('sent_date'),
+          deliveredDate: row.read<DateTime>('delivered_date'),
+        );
+      }).toList();
+    });
+    return data;
+  }
+
 
   @override
   int get schemaVersion => 3;
 
   Future<int> insertMessage(MessagesCompanion message) async {
     final result = into(messages).insert(message);
-    _updateMessageStream(); // Mettre à jour le StreamController
     return result;
   }
 
   Future<List<Message>> getAllMessages() => select(messages).get();
 
   Future<void> updateMessage(int id, MessagesCompanion updatedMessage) {
-
-    final result =  (update(messages)..where((tbl) => tbl.id.equals(id)))
+    final result = (update(messages)..where((tbl) => tbl.id.equals(id)))
         .write(updatedMessage);
-    _updateMessageStream(); // Mettre à jour le StreamController
     return result;
   }
 
@@ -98,7 +109,6 @@ class AppDatabase extends _$AppDatabase {
     if (jobId != null) {
       updt.where((tbl) => tbl.jobId.equals(jobId));
     }
-    _updateMessageStream(); // Mettre à jour le StreamController
 
     return updt.write(updatedMessage);
   }

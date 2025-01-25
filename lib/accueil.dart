@@ -17,7 +17,7 @@ class Accueil extends StatefulWidget {
 }
 
 class _AccueilState extends State<Accueil> with TickerProviderStateMixin {
-  late BackgroundServiceManager _backgroundServiceManager;
+  late final BackgroundServiceManager _backgroundServiceManager;
   String currentTime = "Pas encore reçu";
 
   bool light = false;
@@ -25,7 +25,6 @@ class _AccueilState extends State<Accueil> with TickerProviderStateMixin {
   late LinearTimerController timerController = LinearTimerController(this);
   late final Stream<List<Message>> myDataStream;
   final ScrollController _scrollController = ScrollController();
-  late Stream<List<Message>> _messageStream;
 
   @override
   void initState() {
@@ -39,9 +38,8 @@ class _AccueilState extends State<Accueil> with TickerProviderStateMixin {
     _backgroundServiceManager = BackgroundServiceManager(); // recupere le singleton
 
     // Créer le Stream Drift une seule fois
-
+    myDataStream = _backgroundServiceManager.database.watchAllMessages();
     _initBackgroundService(); // Appel pour enregistrer les écouteurs
-    _messageStream = BackgroundServiceManager().messageStream; // Récupérer le Stream
 
   }
 
@@ -204,7 +202,7 @@ class _AccueilState extends State<Accueil> with TickerProviderStateMixin {
                 ),
                 child: Center(
                   child: StreamBuilder<List<Message>>(
-                    stream: _messageStream,
+                    stream: myDataStream,
                     // initialData: const [],
                     builder: (context, snapshot) {
                       if (snapshot.connectionState == ConnectionState.waiting && snapshot.data == null) {
