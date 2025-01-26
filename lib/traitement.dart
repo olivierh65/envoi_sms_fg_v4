@@ -13,11 +13,11 @@ class Traitement {
   Completer<void>? completer;
   static bool _isPaused  = false;
   late StreamController<void> _pauseController;
-  late BackgroundServiceManager _backgroundServiceManager;
+  late final AppDatabase _database;
 
-  Traitement (BackgroundServiceManager backgroundServiceManager, {bool paused = true}) {
+  Traitement (AppDatabase database, {bool paused = true}) {
     _isPaused = paused;
-    _backgroundServiceManager = backgroundServiceManager;
+    _database = database;
     _pauseController = StreamController<void>.broadcast();
   }
 
@@ -58,8 +58,8 @@ class Traitement {
 
       for (var item in jsonData) {
         try {
-          if (await _backgroundServiceManager.database.isMessageExist(item['messageId'], item['jobId']) == 0) {
-            await _backgroundServiceManager.database.insertMessage(
+          if (await _database.isMessageExist(item['messageId'], item['jobId']) == 0) {
+            await _database.insertMessage(
               MessagesCompanion(
                 number: Value(item['number']),
                 message: Value(item['message']),
@@ -81,7 +81,7 @@ class Traitement {
   }
 
   Future<void> _traiteCache(ServiceInstance service, SharedPreferences prefs) async {
-    final List<Message> messages = await _backgroundServiceManager.database.getMessagesNotSent();
+    final List<Message> messages = await _database.getMessagesNotSent();
 
     print("requete terminee");
 
@@ -90,7 +90,7 @@ class Traitement {
       print("envoi de ${message.id}");
       await Future.delayed(const Duration(seconds: 2));
       print("Envoyé");
-      await _backgroundServiceManager.database.updateMessageSent(
+      await _database.updateMessageSent(
         message.id,
         message.jobId,
       );
@@ -149,7 +149,7 @@ class Traitement {
 
   // Méthode pour nettoyer les ressources
   Future<void> dispose() async {
-    await _backgroundServiceManager.database.close();
+    await _database.close();
     _pauseController.close(); // Fermer aussi _pauseController
   }
 }

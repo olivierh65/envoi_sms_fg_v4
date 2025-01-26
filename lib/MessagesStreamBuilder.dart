@@ -27,9 +27,12 @@ class MessagesStreamBuilder extends StatelessWidget {
         if (!snapshot.hasData || snapshot.data!.isEmpty) {
           return const Center(child: Text("Aucune donnée disponible"));
         }
-
         // Les données sont prêtes
         final messages = snapshot.data ?? [];
+        if (messages.isEmpty &&
+            snapshot.connectionState == ConnectionState.done) {
+          return const Center(child: Text("Aucun message"));
+        }
         return MessagesListView(messages: messages);
       },
     );
@@ -38,18 +41,18 @@ class MessagesStreamBuilder extends StatelessWidget {
 
 class MessagesListView extends StatelessWidget {
   final List<Message> messages;
+  final ScrollController _scrollController = ScrollController();
 
-  const MessagesListView({Key? key, required this.messages}) : super(key: key);
+  MessagesListView({Key? key, required this.messages}) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
-    final ScrollController scrollController = ScrollController();
 
     return Scrollbar(
-      controller: scrollController,
+      controller: _scrollController,
       thumbVisibility: true, // Pour afficher la scrollbar en permanence
       child: ListView.builder(
-        controller: scrollController, // Associer le même ScrollController au ListView
+        controller: _scrollController, // Associer le même ScrollController au ListView
         itemCount: messages.length,
         itemBuilder: (context, index) {
           final message = messages[index];

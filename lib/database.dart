@@ -31,8 +31,10 @@ class Messages extends Table {
 @DriftDatabase(tables: [Messages])
 class AppDatabase extends _$AppDatabase {
 
-  AppDatabase(BackgroundServiceManager backgroundServiceManager)
+  AppDatabase()
       : super(_openConnection()) {
+    print("Constructeur AppDatabase");
+    print("StackTrace actuel : ${StackTrace.current}");
   }
 
   static LazyDatabase _openConnection() {

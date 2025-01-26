@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:isolate';
 import 'dart:ui';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter_background_service/flutter_background_service.dart';
@@ -7,33 +8,53 @@ import 'database.dart';
 
 
 class BackgroundServiceManager {
-  final FlutterBackgroundService _service = FlutterBackgroundService();
+  late final FlutterBackgroundService _service;
   static Timer? _timer;
-  late final AppDatabase _database;
-  late final Traitement _traitement;
 
-  static final BackgroundServiceManager _instance = BackgroundServiceManager._internal(); // Instance privée
+  static SendPort? _mainSendPort;
+  static ReceivePort? _backgroundReceivePort;
 
+  // Instance statique privée
+  static final BackgroundServiceManager _instance = BackgroundServiceManager._internal();
+
+  // Factory pour retourner l'instance unique
   factory BackgroundServiceManager() {
-    return _instance; // Retourner l'instance unique
+    return _instance;
   }
 
+  // Constructeur privé
   BackgroundServiceManager._internal() {
-    _database = AppDatabase(this);
-    _traitement = Traitement(this);
+    _service = FlutterBackgroundService();
   }
 
-  AppDatabase get database => _database;
+  // Getter pour accéder à l'instance unique
+  static BackgroundServiceManager get instance => _instance;
 
-  Traitement get traitement => _traitement;
+  // Exemple de méthode pour vérifier l'unicité
+  String get instanceId => hashCode.toString();
 
 
   bool isRunning = false;
   get dataStream => null;
 
+  // Exposer un BroadcastStream pour surveiller les messages
+  Stream<List<Message>> get messageStream =>
+      _backgroundReceivePort!.cast<List<Message>>().asBroadcastStream();
+
+  // Ajouter une méthode pour transmettre le SendPort de l'isolate principal
+  static void setMainSendPort(SendPort sendPort) {
+    _mainSendPort = sendPort;
+  }
+
+  // Appeler cette méthode depuis l'isolate principal pour envoyer un message
+  void sendMessageToBackground(String message) {
+    _mainSendPort?.send(message);
+  }
+
+
   Future<void> initialize() async {
-    final service = FlutterBackgroundService();
-    await service.configure(
+    // final service = FlutterBackgroundService();
+    await _service.configure(
       androidConfiguration: AndroidConfiguration(
         onStart: onStart,
         isForegroundMode: true,
@@ -56,15 +77,34 @@ class BackgroundServiceManager {
   // Fonction qui sera exécutée lorsque le service démarre
   static void onStart(ServiceInstance service) async {
     DartPluginRegistrant.ensureInitialized();
+
+    // Initialiser le ReceivePort pour l'isolate de fond
+    final _backgroundReceivePort = ReceivePort();
+    final _backgroundSendPort = _backgroundReceivePort.sendPort; // Stocker le SendPort
+
+    _backgroundReceivePort!.listen((message) {
+      print("Message reçu dans onStart: $message");
+      _backgroundSendPort.send(message);
+    });
+
+    IsolateNameServer.registerPortWithName(_backgroundReceivePort.sendPort, 'messageStreamPort');
+
     final prefs = await SharedPreferences.getInstance();
-    // Accéder à l'instance unique via BackgroundServiceManager()
-    final backgroundServiceManager = BackgroundServiceManager();
+    // Initialiser la base de données
+    final database = AppDatabase();
+
+    // Initialiser le traitement
+    final traitement = Traitement(database);
 
 
     final completer = Completer<void>();
-    backgroundServiceManager._traitement.completer = completer;
+    traitement.completer = completer;
 
-
+    // Créer un flux pour surveiller les messages
+    database.watchAllMessages().listen((messages) {
+      // Envoyer les données au principal à chaque mise à jour
+      _backgroundSendPort.send(messages);
+    });
 
 
     if (service is AndroidServiceInstance) {
@@ -75,36 +115,36 @@ class BackgroundServiceManager {
       );
 
       service.on('stopService').listen((event) async {
-        if (backgroundServiceManager._traitement.completer!.isCompleted) {
-          await backgroundServiceManager._database.close(); // Fermeture de la base de données
+        if (traitement.completer!.isCompleted) {
+          await database.close(); // Fermeture de la base de données
           service.stopSelf();
         } else {
           print("Attente fin de traitement");
-          await backgroundServiceManager._traitement.completer!.future;
-          await backgroundServiceManager._database.close(); // Fermeture de la base de données
+          await traitement.completer!.future;
+          await database.close(); // Fermeture de la base de données
           service.stopSelf();
         }
       });
 
       service.on('startTraitement').listen((event) {
-        backgroundServiceManager._traitement.doWork(service, prefs);
-        _startTimer(service, backgroundServiceManager._traitement); // Démarrer le timer ici
+        traitement.doWork(service, prefs);
+        _startTimer(service, traitement); // Démarrer le timer ici
       });
 
       service.on('stopTraitement').listen((event) {
-        backgroundServiceManager._traitement.stopProcessing();
+        traitement.stopProcessing();
       });
 
       service.on('pause').listen((_) {
-        backgroundServiceManager._traitement.pause();
+        traitement.pause();
         _stopTimer();
         service.invoke('update', {"current_time": 'Pause'});
       });
 
       service.on('resume').listen((_) {
-        backgroundServiceManager._traitement.resume();
-        backgroundServiceManager._traitement.doWork(service, prefs);
-        _startTimer(service, backgroundServiceManager._traitement);
+        traitement.resume();
+        traitement.doWork(service, prefs);
+        _startTimer(service, traitement);
       });
     }
   }
@@ -140,10 +180,6 @@ class BackgroundServiceManager {
 
   void resumeTraitement() {
     _service.invoke('resume');
-  }
-
-  void dispose() {
-    _database.close();
   }
 
   static bool onIosBackground(ServiceInstance service) {

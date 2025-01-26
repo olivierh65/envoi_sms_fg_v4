@@ -1,8 +1,11 @@
 import 'dart:collection';
+import 'dart:isolate';
+import 'dart:ui';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_easyloading/flutter_easyloading.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'shared_preferences_provider.dart';
 import 'app_preferences.dart';
 import '/route_generator.dart';
@@ -10,9 +13,7 @@ import 'package:talker_flutter/talker_flutter.dart';
 import 'background_service.dart';
 import 'traitement.dart';
 
-
 void main() async {
-
   // Initialiser le logger
   final logger = AppLogger();
   logger.init();
@@ -29,11 +30,18 @@ void main() async {
 
   // Initialiser BackgroundServiceManager avec les instances partagées
   final backgroundService = BackgroundServiceManager();
+  print("Instance ID : ${backgroundService.instanceId}");
+
+  final backgroundSendPort = IsolateNameServer.lookupPortByName('messageStreamPort');
+  final backgroundReceivePort = ReceivePort();
+  backgroundSendPort?.send(backgroundReceivePort.sendPort); // Envoyer le SendPort de l'isolate principal
+
+
   await backgroundService.initialize();
 
   // Créer l'instance de MyappArgs
   final myappArgs = MyappArgs();
-  myappArgs.backgroundService  = backgroundService ;
+  myappArgs.backgroundService = backgroundService;
 
   // Personnaliser EasyLoading
   EasyLoading.instance
@@ -41,11 +49,10 @@ void main() async {
     ..indicatorColor = Colors.grey
     ..maskType = EasyLoadingMaskType.black;
 
-
   // Démarrer l'application en utilisant ProviderScope
   runApp(
     ProviderScope(
-      child: MyApp(args: myappArgs), // Passez les arguments à l'app
+      child: MyApp(args: myappArgs, receivePort: backgroundReceivePort,), // Passez les arguments à l'app
     ),
   );
 }
@@ -79,13 +86,20 @@ void _initPrefs() {
 
 class MyApp extends ConsumerWidget {
   final MyappArgs args;
+  final ReceivePort receivePort;
 
-  const MyApp({required this.args, super.key});
+  const MyApp({
+    required this.args,
+    required this.receivePort,
+    Key? key,
+  }) : super(key: key);
 
   // This widget is the root of your application.
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    ref.read(sharedPreferencesProvider.notifier).loadPreferences(); // Assurez-vous que cela est asynchrone dans le Notifier
+    ref
+        .read(sharedPreferencesProvider.notifier)
+        .loadPreferences(); // Assurez-vous que cela est asynchrone dans le Notifier
     final preferences = ref.watch(sharedPreferencesProvider);
 
     return MaterialApp(
@@ -100,11 +114,11 @@ class MyApp extends ConsumerWidget {
         onGenerateRoute: (settings) {
           return RouteGenerator.generateRoute(
               RouteSettings(name: settings.name, arguments: settings.arguments),
-              args, this);
+              args,
+              this);
         });
   }
 }
-
 
 class MyappArgs extends MapBase<String, dynamic> {
   final Map<String, dynamic> _map = HashMap.identity();
@@ -120,7 +134,6 @@ class MyappArgs extends MapBase<String, dynamic> {
   @override
   void clear() => _map.clear();
 
-
   @override
   Iterable<String> get keys => _map.keys;
 
@@ -135,7 +148,9 @@ class MyappArgs extends MapBase<String, dynamic> {
     print("backgroudService null!!");
     return null;
   }
-  set backgroundService(BackgroundServiceManager? value) => this['backgroundService'] = value;
+
+  set backgroundService(BackgroundServiceManager? value) =>
+      this['backgroundService'] = value;
 
   Traitement? get traitement {
     final value = _map['traitement'];
@@ -148,9 +163,7 @@ class MyappArgs extends MapBase<String, dynamic> {
   set traitement(Traitement? value) => this['traitement'] = value;
 }
 
-
-class AppLogger extends Talker{
-
+class AppLogger extends Talker {
   // Constructeur privé
   static final Talker _talker = TalkerFlutter.init(
     settings: TalkerSettings(

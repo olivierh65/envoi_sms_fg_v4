@@ -1,3 +1,5 @@
+import 'dart:isolate';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_easyloading/flutter_easyloading.dart';
 import 'package:linear_timer/linear_timer.dart';
@@ -8,10 +10,16 @@ import 'package:flutter_background_service/flutter_background_service.dart';
 import 'database.dart'; // Import pour la classe Message
 
 class Accueil extends StatefulWidget {
-  const Accueil({super.key, required this.title, required this.args});
-
   final String title;
   final MyappArgs args;
+  final ReceivePort receivePort;
+
+  const Accueil({
+    required this.title,
+    required this.args,
+    required this.receivePort,
+    Key? key,
+  }) : super(key: key);
 
   @override
   State<Accueil> createState() => _AccueilState();
@@ -25,7 +33,6 @@ class _AccueilState extends State<Accueil> with TickerProviderStateMixin {
 
   late LinearTimerController timerController = LinearTimerController(this);
   late final Stream<List<Message>> myDataStream;
-  final ScrollController _scrollController = ScrollController();
 
   @override
   void initState() {
@@ -36,13 +43,13 @@ class _AccueilState extends State<Accueil> with TickerProviderStateMixin {
       return; // Très important de retourner ici pour éviter l'erreur
     }
 
-    _backgroundServiceManager = BackgroundServiceManager(); // recupere le singleton
-
-    // Créer le Stream Drift une seule fois
-    myDataStream = _backgroundServiceManager.database.watchAllMessages();
-    _initBackgroundService(); // Appel pour enregistrer les écouteurs
-
+    _backgroundServiceManager =
+        BackgroundServiceManager(); // recupere le singleton
+    // Créer un Stream à partir du ReceivePort
+    myDataStream = widget.receivePort.cast<
+        List<Message>>().asBroadcastStream(); // Cast des données reçues en Stream<List<Message>>
   }
+
 
   Future<void> _initBackgroundService() async {
     FlutterBackgroundService().on('update').listen((data) {
@@ -219,15 +226,13 @@ class _AccueilState extends State<Accueil> with TickerProviderStateMixin {
       case 'Logs':
         /* Navigator.of(context).push(MaterialPageRoute(
           builder: (context) => TalkerScreen(talker: globals.Logger),*/
-        Navigator.pushNamed(context, "/logs",
-            arguments: widget.args['Logger']);
+        Navigator.pushNamed(context, "/logs", arguments: widget.args['Logger']);
         break;
       case 'Settings':
         Navigator.pushNamed(context, '/settings', arguments: widget.args);
         break;
     }
   }
-
 
   updateTimer(var a) {
     a.timerController.value;
