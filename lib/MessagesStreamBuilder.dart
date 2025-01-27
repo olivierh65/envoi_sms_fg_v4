@@ -5,8 +5,7 @@ import 'database.dart';
 class MessagesStreamBuilder extends StatelessWidget {
   final Stream<List<Map<String, dynamic>>> mapStream;
 
-  MessagesStreamBuilder({Key? key, required this.mapStream})
-      : super(key: key) {
+  MessagesStreamBuilder({super.key, required this.mapStream}) {
     // print("MessagesStreamBuilder - construit");
   }
 
@@ -19,7 +18,7 @@ class MessagesStreamBuilder extends StatelessWidget {
     return StreamBuilder<List<Message>>(
       stream: streamOfMessages,
       builder: (context, snapshot) {
-        print("StreamBuilder - snapshot mis à jour");
+        debugPrint("StreamBuilder - snapshot mis à jour");
         if (snapshot.connectionState == ConnectionState.waiting &&
             snapshot.data == null) {
           return const Center(child: CircularProgressIndicator());
@@ -54,7 +53,7 @@ class MessagesListView extends StatelessWidget {
   final List<Message> messages;
   final ScrollController _scrollController = ScrollController();
 
-  MessagesListView({Key? key, required this.messages}) : super(key: key);
+  MessagesListView({super.key, required this.messages});
 
   @override
   Widget build(BuildContext context) {

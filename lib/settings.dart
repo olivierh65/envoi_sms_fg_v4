@@ -37,14 +37,14 @@ class SettingsState extends State<Settings> {
     super.initState();
 
     // final MyPrefs = widget.args?['MyPrefs'] as SharedPreferences;
-    final MyPrefs = AppPreferences();
-    sendUrl = MyPrefs.getString('sendUrl');
-    receiveUrl = MyPrefs.getString('receiveUrl');
-    statusUrl = MyPrefs.getString('statusUrl');
-    queryInterval = MyPrefs.getString('queryInterval');
-    deviceId = MyPrefs.getString('deviceId');
-    sendInterval = MyPrefs.getString('sendInterval');
-    webApiKey = MyPrefs.getString('webApiKey');
+    final myPrefs = AppPreferences();
+    sendUrl = myPrefs.getString('sendUrl');
+    receiveUrl = myPrefs.getString('receiveUrl');
+    statusUrl = myPrefs.getString('statusUrl');
+    queryInterval = myPrefs.getString('queryInterval');
+    deviceId = myPrefs.getString('deviceId');
+    sendInterval = myPrefs.getString('sendInterval');
+    webApiKey = myPrefs.getString('webApiKey');
     }
 
   @override
@@ -244,31 +244,31 @@ class SettingsState extends State<Settings> {
 
   savePrefs() async {
     // final MyPrefs = widget.args?['MyPrefs'] as SharedPreferences;
-    final MyPrefs = AppPreferences();
+    final myPrefs = AppPreferences();
     // Validate returns true if the form is valid, or false otherwise.
     if (_formKey.currentState!.validate()) {
       // If the form is valid, display a snackbar. In the real world,
       // you'd often call a server or save the information in a database.
       if (sendUrl != null) {
-        MyPrefs.setString('sendUrl', sendUrl!);
+        myPrefs.setString('sendUrl', sendUrl!);
       }
       if (receiveUrl != null) {
-        MyPrefs.setString('receiveUrl', receiveUrl!);
+        myPrefs.setString('receiveUrl', receiveUrl!);
       }
       if (statusUrl != null) {
-        MyPrefs.setString('statusUrl', statusUrl!);
+        myPrefs.setString('statusUrl', statusUrl!);
       }
       if (queryInterval != null) {
-        MyPrefs.setString('queryInterval', queryInterval!);
+        myPrefs.setString('queryInterval', queryInterval!);
       }
       if (deviceId != null) {
-        MyPrefs.setString('deviceId', deviceId!);
+        myPrefs.setString('deviceId', deviceId!);
       }
       if (sendInterval != null) {
-        MyPrefs.setString('sendInterval', sendInterval!);
+        myPrefs.setString('sendInterval', sendInterval!);
       }
       if (webApiKey != null) {
-        MyPrefs.setString('webApiKey', webApiKey!);
+        myPrefs.setString('webApiKey', webApiKey!);
       }
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Settings saved')),

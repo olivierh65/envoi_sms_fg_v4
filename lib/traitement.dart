@@ -1,11 +1,11 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:developer';
+import 'package:flutter/cupertino.dart';
 import 'package:flutter_background_service/flutter_background_service.dart';
 import 'package:http/http.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:drift/drift.dart';
-import 'background_service.dart';
 import 'database.dart'; // fichier Drift
 
 class Traitement {
@@ -23,25 +23,23 @@ class Traitement {
 
   Future<void> loadState() async {
     // Simule la récupération de l'état sauvegardé
-    print('État chargé : étape');
+    debugPrint('État chargé : étape');
   }
 
   Future<void> saveState(int step) async {
     // Simule la sauvegarde de l'état
-    print('Sauvegarde de l\'état : étape $step');
+    debugPrint('Sauvegarde de l\'état : étape $step');
     await Future.delayed(Duration(milliseconds: 500)); // Simule une écriture en DB
     // _setSavedState(step);
   }
 
   Future<void> doWork(ServiceInstance service, SharedPreferences prefs) async {
-    late DateTime lastList;
-    List<dynamic>? data;
 
     if (_isPaused) {
-      print("Traitement en pause, sortie.");
+      debugPrint("Traitement en pause, sortie.");
       return;
     }
-    print("Entree doWork");
+    debugPrint("Entree doWork");
 
     await _checkPause();
     await _traiteCache(service, prefs);
@@ -51,7 +49,6 @@ class Traitement {
     Response? resp = await _getList(prefs);
     service.invoke('querydb', {'hide': ''});
 
-    lastList = DateTime.now();
 
     if ((resp != null) && (resp.contentLength! > 0)) {
       List<dynamic> jsonData = jsonDecode(resp.body);
@@ -70,7 +67,7 @@ class Traitement {
             );
           }
         } catch (e) {
-          print("Erreur lors de l'insertion du message : $e");
+          debugPrint("Erreur lors de l'insertion du message : $e");
         }
       }
     }
@@ -83,13 +80,13 @@ class Traitement {
   Future<void> _traiteCache(ServiceInstance service, SharedPreferences prefs) async {
     final List<Message> messages = await _database.getMessagesNotSent();
 
-    print("requete terminee");
+    debugPrint("requete terminee");
 
     for (var message in messages) {
       await _checkPause();
-      print("envoi de ${message.id}");
+      debugPrint("envoi de ${message.id}");
       await Future.delayed(const Duration(seconds: 2));
-      print("Envoyé");
+      debugPrint("Envoyé");
       await _database.updateMessageSent(
         message.id,
         message.jobId,
@@ -100,9 +97,9 @@ class Traitement {
 
   Future<void> _checkPause() async {
     if (_isPaused) {
-      print('Traitement mis en pause. Attente de la reprise...');
+      debugPrint('Traitement mis en pause. Attente de la reprise...');
       await _pauseController.stream.first;
-      print('Traitement repris.');
+      debugPrint('Traitement repris.');
     }
   }
 

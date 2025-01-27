@@ -5,13 +5,11 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter_easyloading/flutter_easyloading.dart';
 // import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 //import 'shared_preferences_provider.dart';
 import 'app_preferences.dart';
 import '/route_generator.dart';
 import 'package:talker_flutter/talker_flutter.dart';
 import 'background_service.dart';
-import 'traitement.dart';
 
 void main() async {
   // Initialiser le logger
@@ -37,7 +35,7 @@ void main() async {
 
   final backgroundSendPort = IsolateNameServer.lookupPortByName('messageStreamPort');
   final foregroundReceivePort = ReceivePort();
-  print("envoie du sendPort");
+  debugPrint("envoie du sendPort");
   IsolateNameServer.registerPortWithName(foregroundReceivePort.sendPort, 'UIStreamPort');
 
 
@@ -99,7 +97,6 @@ class MyApp {
   });
 
   // This widget is the root of your application.
-  @override
   Widget build(BuildContext context) {
 
     return MaterialApp(
@@ -145,7 +142,7 @@ class MyappArgs extends MapBase<String, dynamic> {
     if (value is BackgroundServiceManager) {
       return value;
     }
-    print("backgroudService null!!");
+    debugPrint("backgroudService null!!");
     return null;
   }
 

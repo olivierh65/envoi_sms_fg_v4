@@ -56,21 +56,21 @@ class BackgroundServiceManager {
   // Fonction qui sera exécutée lorsque le service démarre
   static void onStart(ServiceInstance service) async {
 
-    print("onStart exécutée");
+    debugPrint("onStart exécutée");
     // DartPluginRegistrant.ensureInitialized();
 
     // Initialiser le ReceivePort pour l'isolate de fond
-    final _backgroundReceivePort = ReceivePort();
-    IsolateNameServer.registerPortWithName(_backgroundReceivePort.sendPort, 'messageStreamPort');
-    final UISendPort = IsolateNameServer.lookupPortByName('UIStreamPort');
+    final backgroundReceivePort = ReceivePort();
+    IsolateNameServer.registerPortWithName(backgroundReceivePort.sendPort, 'messageStreamPort');
+    final SendPort? UISendPort = IsolateNameServer.lookupPortByName('UIStreamPort');
 
-    _backgroundReceivePort.listen((message) {
+    backgroundReceivePort.listen((message) {
       if (message is SendPort) {
-        print("sendport recu");
-        var _mainSendPort = message as SendPort;
+        debugPrint("sendport recu");
+        var mainSendPort = message;
       }
       else {
-        print("Message reçu dans onStart: $message");
+        debugPrint("Message reçu dans onStart: $message");
       }
     });
 
@@ -107,7 +107,7 @@ class BackgroundServiceManager {
           await database.close(); // Fermeture de la base de données
           service.stopSelf();
         } else {
-          print("Attente fin de traitement");
+          debugPrint("Attente fin de traitement");
           await traitement.completer!.future;
           await database.close(); // Fermeture de la base de données
           service.stopSelf();
@@ -143,7 +143,7 @@ class BackgroundServiceManager {
 
   static void _startTimer(ServiceInstance service, Traitement traitement) {
     _timer=Timer.periodic(const Duration(seconds: 5), (timer) async {
-      print("Heure actuelle : ${DateTime.now()}");
+      debugPrint("Heure actuelle : ${DateTime.now()}");
       service.invoke('update', {
         "current_time": DateTime.now().toIso8601String(),
       });
@@ -175,7 +175,7 @@ class BackgroundServiceManager {
   }
 
   static bool onIosBackground(ServiceInstance service) {
-    print("iOS Background Task exécutée");
+    debugPrint("iOS Background Task exécutée");
     return true;
   }
 }

@@ -2,11 +2,10 @@ import 'dart:io';
 
 import 'package:drift/drift.dart';
 import 'package:drift/native.dart';
+import 'package:flutter/foundation.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
-import 'package:rxdart/rxdart.dart';
 
-import 'background_service.dart';
 
 // Import pour ValueNotifier
 
@@ -33,8 +32,8 @@ class Messages extends Table {
 @DriftDatabase(tables: [Messages])
 class AppDatabase extends _$AppDatabase {
   AppDatabase() : super(_openConnection()) {
-    print("Constructeur AppDatabase");
-    print("StackTrace actuel : ${StackTrace.current}");
+    debugPrint("Constructeur AppDatabase");
+    debugPrint("StackTrace actuel : ${StackTrace.current}");
   }
 
   static LazyDatabase _openConnection() {
@@ -52,11 +51,11 @@ class AppDatabase extends _$AppDatabase {
   }
 
   Stream<List<Map<String, dynamic>>> watchAllMessages() async* {
-    var _messages = select(messages)
+    var messagesList = select(messages)
       ..orderBy([(t) => OrderingTerm(expression: t.id, mode: OrderingMode.desc)])
       ..get();
 
-    await for (var messageList in _messages.watch()) {
+    await for (var messageList in messagesList.watch()) {
       // Sérialisation des messages avant de les émettre
       var serializedMessages = messageList.map((msg) {
         // Sérialiser chaque Message en JSON
@@ -67,11 +66,11 @@ class AppDatabase extends _$AppDatabase {
   }
 
   Stream<List<Message>> ___watchAllMessages() {
-    var _messages = select(messages)
+    var messagesList = select(messages)
       ..orderBy(
           [(t) => OrderingTerm(expression: t.id, mode: OrderingMode.desc)])
       ..get();
-    return _messages.watch();
+    return messagesList.watch();
   }
 
   Stream<List<Message>> __watchAllMessages() {

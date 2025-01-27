@@ -1,5 +1,4 @@
 import 'dart:isolate';
-import 'dart:ui';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_easyloading/flutter_easyloading.dart';
@@ -19,8 +18,8 @@ class Accueil extends StatefulWidget {
     required this.title,
     required this.args,
     required this.receivePort,
-    Key? key,
-  }) : super(key: key);
+    super.key,
+  });
 
   @override
   State<Accueil> createState() => _AccueilState();
@@ -40,7 +39,7 @@ class _AccueilState extends State<Accueil> with TickerProviderStateMixin {
   void initState() {
     super.initState();
     if (widget.args.backgroundService == null) {
-      print(
+      debugPrint(
           "Erreur: backgroundService est null (ceci ne devrait pas arriver si l'initialisation dans main.dart est correcte)");
       return; // Très important de retourner ici pour éviter l'erreur
     }
@@ -119,7 +118,6 @@ class _AccueilState extends State<Accueil> with TickerProviderStateMixin {
   @override
   Widget build(BuildContext context) {
     // Accéder au logger depuis n'importe où
-    final logger = AppLogger();
 
     return Scaffold(
       appBar: AppBar(
