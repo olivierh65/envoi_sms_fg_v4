@@ -5,16 +5,19 @@ import 'package:flutter/material.dart';
 import 'package:rxdart/rxdart.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter_background_service/flutter_background_service.dart';
+import 'package:talker_flutter/talker_flutter.dart';
 import 'traitement.dart';
 import 'database.dart';
-
 
 class BackgroundServiceManager {
   late final FlutterBackgroundService _service;
   static Timer? _timer;
 
+  static late final SendPort? UISendPort;
+
   // Instance statique privée
-  static final BackgroundServiceManager _instance = BackgroundServiceManager._internal();
+  static final BackgroundServiceManager _instance =
+      BackgroundServiceManager._internal();
 
   // Factory pour retourner l'instance unique
   factory BackgroundServiceManager() {
@@ -26,10 +29,8 @@ class BackgroundServiceManager {
     _service = FlutterBackgroundService();
   }
 
-
   bool isRunning = false;
   get dataStream => null;
-
 
   void initialize() async {
     // final service = FlutterBackgroundService();
@@ -52,24 +53,27 @@ class BackgroundServiceManager {
     await _service.startService();
   }
 
-
   // Fonction qui sera exécutée lorsque le service démarre
   static void onStart(ServiceInstance service) async {
-
     debugPrint("onStart exécutée");
+
+    // Ne peut etre executé que dans le process principal
     // DartPluginRegistrant.ensureInitialized();
 
     // Initialiser le ReceivePort pour l'isolate de fond
     final backgroundReceivePort = ReceivePort();
-    IsolateNameServer.registerPortWithName(backgroundReceivePort.sendPort, 'messageStreamPort');
-    final SendPort? UISendPort = IsolateNameServer.lookupPortByName('UIStreamPort');
+    IsolateNameServer.registerPortWithName(
+        backgroundReceivePort.sendPort, 'messageStreamPort');
+    final SendPort? UIStreamSendPort =
+        IsolateNameServer.lookupPortByName('UIStreamPort');
+
+    UISendPort = IsolateNameServer.lookupPortByName('UIPort');
 
     backgroundReceivePort.listen((message) {
       if (message is SendPort) {
         debugPrint("sendport recu");
         var mainSendPort = message;
-      }
-      else {
+      } else {
         debugPrint("Message reçu dans onStart: $message");
       }
     });
@@ -77,23 +81,24 @@ class BackgroundServiceManager {
     final prefs = await SharedPreferences.getInstance();
     // Initialiser la base de données
     final database = AppDatabase();
+    logMessage("Database initialized", level: TalkerLogType.info);
 
     // Initialiser le traitement
-    final traitement = Traitement(database);
-
+    final traitement = Traitement(database, logMessage: logMessage);
+    logMessage("Traitement initialized", level: TalkerLogType.info);
 
     final completer = Completer<void>();
     traitement.completer = completer;
 
     // Créer un flux pour surveiller les messages
-    database.watchAllMessages()
-        .debounceTime(const Duration(milliseconds: 5000))
+    database
+        .watchAllMessages()
+        /* .debounceTime(const Duration(milliseconds: 5000)) */
         .listen((messages) {
       // Envoyer les données au principal à chaque mise à jour
       debugPrint("Messages updated: ${messages.length} messages");
-      UISendPort?.send(messages);
+      UIStreamSendPort?.send(messages);
     });
-
 
     if (service is AndroidServiceInstance) {
       service.setAsForegroundService();
@@ -127,32 +132,35 @@ class BackgroundServiceManager {
         traitement.pause();
         _stopTimer();
         service.invoke('update', {"current_time": 'Pause'});
+        logMessage("Traitement en pause", level: TalkerLogType.info);
       });
 
       service.on('resume').listen((_) {
         traitement.resume();
         traitement.doWork(service, prefs);
         _startTimer(service, traitement);
+        logMessage("Traitement repris", level: TalkerLogType.info);
       });
 
       service.on('update').listen((event) {
-        UISendPort?.send(event);
+        UIStreamSendPort?.send(event);
       });
     }
   }
 
   static void _startTimer(ServiceInstance service, Traitement traitement) {
-    _timer=Timer.periodic(const Duration(seconds: 5), (timer) async {
+    _timer = Timer.periodic(const Duration(seconds: 5), (timer) async {
       debugPrint("Heure actuelle : ${DateTime.now()}");
       service.invoke('update', {
         "current_time": DateTime.now().toIso8601String(),
       });
     });
   }
+
   static void _stopTimer() {
     if (_timer != null) {
       _timer!.cancel();
-      _timer=null;
+      _timer = null;
     }
   }
 
@@ -174,9 +182,13 @@ class BackgroundServiceManager {
     _service.invoke('resume');
   }
 
+  static void logMessage(String message, {TalkerLogType level = TalkerLogType.debug}) {
+
+    UISendPort?.send({'message': message, 'level': level.name});
+  }
+
   static bool onIosBackground(ServiceInstance service) {
     debugPrint("iOS Background Task exécutée");
     return true;
   }
 }
-

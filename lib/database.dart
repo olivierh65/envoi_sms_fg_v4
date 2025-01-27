@@ -33,7 +33,7 @@ class Messages extends Table {
 class AppDatabase extends _$AppDatabase {
   AppDatabase() : super(_openConnection()) {
     debugPrint("Constructeur AppDatabase");
-    debugPrint("StackTrace actuel : ${StackTrace.current}");
+    // debugPrint("StackTrace actuel : ${StackTrace.current}");
   }
 
   static LazyDatabase _openConnection() {

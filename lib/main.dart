@@ -4,10 +4,8 @@ import 'dart:ui';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_easyloading/flutter_easyloading.dart';
-// import 'package:flutter_riverpod/flutter_riverpod.dart';
-//import 'shared_preferences_provider.dart';
 import 'app_preferences.dart';
-import '/route_generator.dart';
+import 'route_generator.dart';
 import 'package:talker_flutter/talker_flutter.dart';
 import 'background_service.dart';
 
@@ -34,9 +32,18 @@ void main() async {
   backgroundService.initialize();
 
   final backgroundSendPort = IsolateNameServer.lookupPortByName('messageStreamPort');
-  final foregroundReceivePort = ReceivePort();
+  final foregroundStreamReceivePort = ReceivePort();
   debugPrint("envoie du sendPort");
-  IsolateNameServer.registerPortWithName(foregroundReceivePort.sendPort, 'UIStreamPort');
+  IsolateNameServer.registerPortWithName(foregroundStreamReceivePort.sendPort, 'UIStreamPort');
+
+  final foregroundReceivePort = ReceivePort();
+  IsolateNameServer.registerPortWithName(foregroundReceivePort.sendPort, 'UIPort');
+
+  foregroundReceivePort.listen((message) {
+      debugPrint("Message reçu dans main: $message");
+
+      AppLogger.talker.log(message['message'], logLevel: LogLevel.values.byName(message['level']));
+  });
 
 
   // Créer l'instance de MyappArgs
@@ -53,7 +60,7 @@ void main() async {
   runApp(
     Builder(
       builder: (BuildContext context) {
-        return MyApp(args: myappArgs, foregroundReceivePort: foregroundReceivePort).build(context);
+        return MyApp(args: myappArgs, foregroundStreamReceivePort: foregroundStreamReceivePort).build(context);
       },
     ),// Passez les arguments à l'app
   );
@@ -89,11 +96,11 @@ void _initPrefs() {
 
 class MyApp {
   final MyappArgs args;
-  final ReceivePort foregroundReceivePort;
+  final ReceivePort foregroundStreamReceivePort;
 
   const MyApp({
     required this.args,
-    required this.foregroundReceivePort,
+    required this.foregroundStreamReceivePort,
   });
 
   // This widget is the root of your application.

@@ -6,6 +6,7 @@ import 'package:flutter_background_service/flutter_background_service.dart';
 import 'package:http/http.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:drift/drift.dart';
+import 'package:talker_flutter/talker_flutter.dart';
 import 'database.dart'; // fichier Drift
 
 class Traitement {
@@ -14,11 +15,13 @@ class Traitement {
   static bool _isPaused  = false;
   late StreamController<void> _pauseController;
   late final AppDatabase _database;
+  late final Function(String message, {TalkerLogType level}) _logMessage;
 
-  Traitement (AppDatabase database, {bool paused = true}) {
+  Traitement (AppDatabase database, {bool paused = true, required void Function(String message, {TalkerLogType level}) logMessage}) {
     _isPaused = paused;
     _database = database;
     _pauseController = StreamController<void>.broadcast();
+    _logMessage = logMessage;
   }
 
   Future<void> loadState() async {
@@ -37,6 +40,7 @@ class Traitement {
 
     if (_isPaused) {
       debugPrint("Traitement en pause, sortie.");
+      _logMessage("Traitement en pause, sortie.", level: TalkerLogType.info);
       return;
     }
     debugPrint("Entree doWork");
@@ -116,6 +120,7 @@ class Traitement {
 
   _getList(SharedPreferences prefs) async {
     final String? url = prefs.getString('sendUrl');
+    _logMessage("Requête vers $url", level: TalkerLogType.info);
     if (url == null) {
       return null;
     }
