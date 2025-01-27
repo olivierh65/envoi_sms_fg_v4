@@ -1,4 +1,5 @@
 import 'dart:isolate';
+import 'dart:ui';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_easyloading/flutter_easyloading.dart';
@@ -7,7 +8,7 @@ import 'MessagesStreamBuilder.dart';
 import 'background_service.dart';
 import 'main.dart';
 import 'package:flutter_background_service/flutter_background_service.dart';
-import 'database.dart'; // Import pour la classe Message
+// Import pour la classe Message
 
 class Accueil extends StatefulWidget {
   final String title;
@@ -23,16 +24,17 @@ class Accueil extends StatefulWidget {
 
   @override
   State<Accueil> createState() => _AccueilState();
+
 }
 
 class _AccueilState extends State<Accueil> with TickerProviderStateMixin {
   late final BackgroundServiceManager _backgroundServiceManager;
   String currentTime = "Pas encore reçu";
 
-  bool light = false;
+  bool _light = false;
 
   late LinearTimerController timerController = LinearTimerController(this);
-  late final Stream<List<Message>> myDataStream;
+  late final Stream<List<Map<String, dynamic>>> myDataStream;
 
   @override
   void initState() {
@@ -45,14 +47,17 @@ class _AccueilState extends State<Accueil> with TickerProviderStateMixin {
 
     _backgroundServiceManager =
         BackgroundServiceManager(); // recupere le singleton
-    // Créer un Stream à partir du ReceivePort
-    myDataStream = widget.receivePort.cast<
-        List<Message>>().asBroadcastStream(); // Cast des données reçues en Stream<List<Message>>
+
+    myDataStream = widget.receivePort.cast<List<Map<String, dynamic>>>().asBroadcastStream();
+    // myDataStream = widget.receivePort.cast<List<Message>>().asBroadcastStream(); // Cast des données reçues en Stream<List<Message>>
+
+  _initBackgroundService();
   }
 
 
   Future<void> _initBackgroundService() async {
     FlutterBackgroundService().on('update').listen((data) {
+      debugPrint('Received update: $data');
       if (data != null && data.containsKey('current_time')) {
         setState(() {
           currentTime = data['current_time'];
@@ -95,6 +100,22 @@ class _AccueilState extends State<Accueil> with TickerProviderStateMixin {
     super.dispose();
   }
 
+  void _onSwitchChanged(bool value) {
+    // This is called when the user toggles the switch.
+    debugPrint("Changement switch");
+    setState(() {
+      _light = value;
+    });
+
+    if (!value) {
+      AppLogger.talker.info("Arrêt");
+      _backgroundServiceManager.pauseTraitement();
+    } else {
+      AppLogger.talker.info("Démarrage");
+      _backgroundServiceManager.resumeTraitement();
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     // Accéder au logger depuis n'importe où
@@ -107,25 +128,12 @@ class _AccueilState extends State<Accueil> with TickerProviderStateMixin {
         actions: <Widget>[
           Switch(
             // This bool value toggles the switch.
-            value: light,
+            value: _light,
             activeColor: Colors.red,
-            onChanged: (bool value) async {
-              // This is called when the user toggles the switch.
-              setState(() {
-                light = value;
-              });
-              final service = FlutterBackgroundService();
-              if (!value) {
-                AppLogger.talker.info("Arrêt");
-                _backgroundServiceManager.pauseTraitement();
-              } else {
-                AppLogger.talker.info("Démarrage");
-                _backgroundServiceManager.resumeTraitement();
-              }
-            },
+            onChanged: _onSwitchChanged
           ),
           // CheckboxSend(widget.args!),
-          PopupMenuButton<String>(
+           PopupMenuButton<String>(
             onSelected: handleClick,
             itemBuilder: (BuildContext context) {
               return {'Logs', 'Settings'}.map((String choice) {
@@ -209,8 +217,8 @@ class _AccueilState extends State<Accueil> with TickerProviderStateMixin {
                   ),
                 ),
                 child: Center(
-                  child: MessagesStreamBuilder(
-                    stream: myDataStream, // Passer le Stream
+                   child: MessagesStreamBuilder(
+                    mapStream: myDataStream, // Passer le Stream
                   ),
                 ),
               ),

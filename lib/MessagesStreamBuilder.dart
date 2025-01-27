@@ -3,18 +3,21 @@ import 'package:flutter/material.dart';
 import 'database.dart';
 
 class MessagesStreamBuilder extends StatelessWidget {
-  final Stream<List<Message>> stream;
+  final Stream<List<Map<String, dynamic>>> mapStream;
 
-  MessagesStreamBuilder({Key? key, required this.stream})
+  MessagesStreamBuilder({Key? key, required this.mapStream})
       : super(key: key) {
-    print("MessagesStreamBuilder - construit");
+    // print("MessagesStreamBuilder - construit");
   }
 
   @override
   Widget build(BuildContext context) {
-    print("MessagesStreamBuilder - reconstruit");
+    // print("MessagesStreamBuilder - reconstruit");
+    // Convertir le Stream de Map en Stream de Message
+    final streamOfMessages = convertStream(mapStream);
+
     return StreamBuilder<List<Message>>(
-      stream: stream,
+      stream: streamOfMessages,
       builder: (context, snapshot) {
         print("StreamBuilder - snapshot mis à jour");
         if (snapshot.connectionState == ConnectionState.waiting &&
@@ -36,6 +39,14 @@ class MessagesStreamBuilder extends StatelessWidget {
         return MessagesListView(messages: messages);
       },
     );
+  }
+  Stream<List<Message>> convertStream(
+      Stream<List<Map<String, dynamic>>> mapStream
+      ) {
+    return mapStream.map((listOfMaps) {
+      // Convertir chaque élément de la liste (Map<String, dynamic>) en Message
+      return listOfMaps.map((map) => Message.fromJson(map)).toList();
+    });
   }
 }
 

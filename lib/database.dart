@@ -4,6 +4,7 @@ import 'package:drift/drift.dart';
 import 'package:drift/native.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
+import 'package:rxdart/rxdart.dart';
 
 import 'background_service.dart';
 
@@ -26,13 +27,12 @@ class Messages extends Table {
   List<String> get customConstraints => [
         'UNIQUE(message_id, job_id)', // Contrainte d'unicité sur le couple
       ];
+
 }
 
 @DriftDatabase(tables: [Messages])
 class AppDatabase extends _$AppDatabase {
-
-  AppDatabase()
-      : super(_openConnection()) {
+  AppDatabase() : super(_openConnection()) {
     print("Constructeur AppDatabase");
     print("StackTrace actuel : ${StackTrace.current}");
   }
@@ -51,12 +51,27 @@ class AppDatabase extends _$AppDatabase {
     await close();
   }
 
-  Stream<List<Message>> watchAllMessages() {
-    return (select(messages)
-          ..orderBy(
-              [(t) => OrderingTerm(expression: t.id, mode: OrderingMode.desc)])
-          ..get())
-        .watch();
+  Stream<List<Map<String, dynamic>>> watchAllMessages() async* {
+    var _messages = select(messages)
+      ..orderBy([(t) => OrderingTerm(expression: t.id, mode: OrderingMode.desc)])
+      ..get();
+
+    await for (var messageList in _messages.watch()) {
+      // Sérialisation des messages avant de les émettre
+      var serializedMessages = messageList.map((msg) {
+        // Sérialiser chaque Message en JSON
+        return msg.toJson();
+      }).toList();
+      yield serializedMessages; // Émet les messages sérialisés
+    }
+  }
+
+  Stream<List<Message>> ___watchAllMessages() {
+    var _messages = select(messages)
+      ..orderBy(
+          [(t) => OrderingTerm(expression: t.id, mode: OrderingMode.desc)])
+      ..get();
+    return _messages.watch();
   }
 
   Stream<List<Message>> __watchAllMessages() {
@@ -68,7 +83,7 @@ class AppDatabase extends _$AppDatabase {
         return Message(
           id: row.read<int>('id'),
           jobId: row.read<int>('job_id'),
-          retrieveDate:  row.read<DateTime>('retrieve_date'),
+          retrieveDate: row.read<DateTime>('retrieve_date'),
           sentDate: row.read<DateTime>('sent_date'),
           deliveredDate: row.read<DateTime>('delivered_date'),
         );
@@ -76,7 +91,6 @@ class AppDatabase extends _$AppDatabase {
     });
     return data;
   }
-
 
   @override
   int get schemaVersion => 3;
@@ -131,6 +145,7 @@ class AppDatabase extends _$AppDatabase {
       return result.length;
     }
   }
+
 
   @override
   MigrationStrategy get migration => MigrationStrategy(

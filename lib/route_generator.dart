@@ -12,7 +12,7 @@ class RouteGenerator {
             builder: (context) => Accueil(
               title: "Appli Test",
               args: args,
-              receivePort: parent.receivePort, // Passer ReceivePort
+              receivePort: parent.foregroundReceivePort, // Passer ReceivePort
                 ),
             settings: RouteSettings(name: settings.name, arguments: args));
       case '/settings':

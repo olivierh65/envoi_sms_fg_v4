@@ -1,6 +1,8 @@
 import 'dart:async';
 import 'dart:isolate';
 import 'dart:ui';
+import 'package:flutter/material.dart';
+import 'package:rxdart/rxdart.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter_background_service/flutter_background_service.dart';
 import 'traitement.dart';
@@ -10,9 +12,6 @@ import 'database.dart';
 class BackgroundServiceManager {
   late final FlutterBackgroundService _service;
   static Timer? _timer;
-
-  static SendPort? _mainSendPort;
-  static ReceivePort? _backgroundReceivePort;
 
   // Instance statique privée
   static final BackgroundServiceManager _instance = BackgroundServiceManager._internal();
@@ -27,38 +26,18 @@ class BackgroundServiceManager {
     _service = FlutterBackgroundService();
   }
 
-  // Getter pour accéder à l'instance unique
-  static BackgroundServiceManager get instance => _instance;
-
-  // Exemple de méthode pour vérifier l'unicité
-  String get instanceId => hashCode.toString();
-
 
   bool isRunning = false;
   get dataStream => null;
 
-  // Exposer un BroadcastStream pour surveiller les messages
-  Stream<List<Message>> get messageStream =>
-      _backgroundReceivePort!.cast<List<Message>>().asBroadcastStream();
 
-  // Ajouter une méthode pour transmettre le SendPort de l'isolate principal
-  static void setMainSendPort(SendPort sendPort) {
-    _mainSendPort = sendPort;
-  }
-
-  // Appeler cette méthode depuis l'isolate principal pour envoyer un message
-  void sendMessageToBackground(String message) {
-    _mainSendPort?.send(message);
-  }
-
-
-  Future<void> initialize() async {
+  void initialize() async {
     // final service = FlutterBackgroundService();
     await _service.configure(
       androidConfiguration: AndroidConfiguration(
         onStart: onStart,
         isForegroundMode: true,
-        autoStart: false,
+        autoStart: true,
         notificationChannelId: 'my_foreground_channel',
         initialNotificationTitle: 'Service en cours',
         initialNotificationContent: 'Le service est en arrière-plan',
@@ -76,18 +55,24 @@ class BackgroundServiceManager {
 
   // Fonction qui sera exécutée lorsque le service démarre
   static void onStart(ServiceInstance service) async {
-    DartPluginRegistrant.ensureInitialized();
+
+    print("onStart exécutée");
+    // DartPluginRegistrant.ensureInitialized();
 
     // Initialiser le ReceivePort pour l'isolate de fond
     final _backgroundReceivePort = ReceivePort();
-    final _backgroundSendPort = _backgroundReceivePort.sendPort; // Stocker le SendPort
-
-    _backgroundReceivePort!.listen((message) {
-      print("Message reçu dans onStart: $message");
-      _backgroundSendPort.send(message);
-    });
-
     IsolateNameServer.registerPortWithName(_backgroundReceivePort.sendPort, 'messageStreamPort');
+    final UISendPort = IsolateNameServer.lookupPortByName('UIStreamPort');
+
+    _backgroundReceivePort.listen((message) {
+      if (message is SendPort) {
+        print("sendport recu");
+        var _mainSendPort = message as SendPort;
+      }
+      else {
+        print("Message reçu dans onStart: $message");
+      }
+    });
 
     final prefs = await SharedPreferences.getInstance();
     // Initialiser la base de données
@@ -101,9 +86,12 @@ class BackgroundServiceManager {
     traitement.completer = completer;
 
     // Créer un flux pour surveiller les messages
-    database.watchAllMessages().listen((messages) {
+    database.watchAllMessages()
+        .debounceTime(const Duration(milliseconds: 5000))
+        .listen((messages) {
       // Envoyer les données au principal à chaque mise à jour
-      _backgroundSendPort.send(messages);
+      debugPrint("Messages updated: ${messages.length} messages");
+      UISendPort?.send(messages);
     });
 
 
@@ -145,6 +133,10 @@ class BackgroundServiceManager {
         traitement.resume();
         traitement.doWork(service, prefs);
         _startTimer(service, traitement);
+      });
+
+      service.on('update').listen((event) {
+        UISendPort?.send(event);
       });
     }
   }

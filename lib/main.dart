@@ -4,9 +4,9 @@ import 'dart:ui';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_easyloading/flutter_easyloading.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
+// import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'shared_preferences_provider.dart';
+//import 'shared_preferences_provider.dart';
 import 'app_preferences.dart';
 import '/route_generator.dart';
 import 'package:talker_flutter/talker_flutter.dart';
@@ -19,6 +19,9 @@ void main() async {
   logger.init();
   logger.info("Démarrage de l'application");
 
+  // debugPrintRebuildDirtyWidgets = true;
+  // debugPrintBuildScope = true;
+
   WidgetsFlutterBinding.ensureInitialized();
 
   // Initialisation des SharedPreferences
@@ -30,14 +33,13 @@ void main() async {
 
   // Initialiser BackgroundServiceManager avec les instances partagées
   final backgroundService = BackgroundServiceManager();
-  print("Instance ID : ${backgroundService.instanceId}");
+  backgroundService.initialize();
 
   final backgroundSendPort = IsolateNameServer.lookupPortByName('messageStreamPort');
-  final backgroundReceivePort = ReceivePort();
-  backgroundSendPort?.send(backgroundReceivePort.sendPort); // Envoyer le SendPort de l'isolate principal
+  final foregroundReceivePort = ReceivePort();
+  print("envoie du sendPort");
+  IsolateNameServer.registerPortWithName(foregroundReceivePort.sendPort, 'UIStreamPort');
 
-
-  await backgroundService.initialize();
 
   // Créer l'instance de MyappArgs
   final myappArgs = MyappArgs();
@@ -51,13 +53,16 @@ void main() async {
 
   // Démarrer l'application en utilisant ProviderScope
   runApp(
-    ProviderScope(
-      child: MyApp(args: myappArgs, receivePort: backgroundReceivePort,), // Passez les arguments à l'app
-    ),
+    Builder(
+      builder: (BuildContext context) {
+        return MyApp(args: myappArgs, foregroundReceivePort: foregroundReceivePort).build(context);
+      },
+    ),// Passez les arguments à l'app
   );
 }
 
 void _initPrefs() {
+  debugPrint("Initialisation des préférences");
   if (!AppPreferences().containsKey('sendUrl')) {
     AppPreferences().setString(
         'sendUrl', 'http://dev10.mcm65.famh.fr/civicrm/smshub/send_test');
@@ -84,23 +89,18 @@ void _initPrefs() {
   }
 }
 
-class MyApp extends ConsumerWidget {
+class MyApp {
   final MyappArgs args;
-  final ReceivePort receivePort;
+  final ReceivePort foregroundReceivePort;
 
   const MyApp({
     required this.args,
-    required this.receivePort,
-    Key? key,
-  }) : super(key: key);
+    required this.foregroundReceivePort,
+  });
 
   // This widget is the root of your application.
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    ref
-        .read(sharedPreferencesProvider.notifier)
-        .loadPreferences(); // Assurez-vous que cela est asynchrone dans le Notifier
-    final preferences = ref.watch(sharedPreferencesProvider);
+  Widget build(BuildContext context) {
 
     return MaterialApp(
         title: 'Flutter Demo',
@@ -152,15 +152,6 @@ class MyappArgs extends MapBase<String, dynamic> {
   set backgroundService(BackgroundServiceManager? value) =>
       this['backgroundService'] = value;
 
-  Traitement? get traitement {
-    final value = _map['traitement'];
-    if (value is Traitement) {
-      return value;
-    }
-    return null;
-  }
-
-  set traitement(Traitement? value) => this['traitement'] = value;
 }
 
 class AppLogger extends Talker {
