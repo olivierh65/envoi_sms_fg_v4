@@ -1,13 +1,19 @@
 import 'dart:collection';
+import 'dart:io';
 import 'dart:isolate';
 import 'dart:ui';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_easyloading/flutter_easyloading.dart';
+import 'package:permission_handler/permission_handler.dart';
 import 'app_preferences.dart';
 import 'route_generator.dart';
 import 'package:talker_flutter/talker_flutter.dart';
 import 'background_service.dart';
+import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+
+final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin =
+    FlutterLocalNotificationsPlugin();
 
 void main() async {
   // Initialiser le logger
@@ -20,6 +26,8 @@ void main() async {
 
   WidgetsFlutterBinding.ensureInitialized();
 
+  await requestNotificationPermission(); // Demander les permissions
+
   // Initialisation des SharedPreferences
   await AppPreferences().init();
 
@@ -31,20 +39,16 @@ void main() async {
   final backgroundService = BackgroundServiceManager();
   backgroundService.initialize();
 
-  final backgroundSendPort = IsolateNameServer.lookupPortByName('messageStreamPort');
+  final backgroundSendPort =
+      IsolateNameServer.lookupPortByName('messageStreamPort');
   final foregroundStreamReceivePort = ReceivePort();
   debugPrint("envoie du sendPort");
-  IsolateNameServer.registerPortWithName(foregroundStreamReceivePort.sendPort, 'UIStreamPort');
+  IsolateNameServer.registerPortWithName(
+      foregroundStreamReceivePort.sendPort, 'UIStreamPort');
 
   final foregroundReceivePort = ReceivePort();
-  IsolateNameServer.registerPortWithName(foregroundReceivePort.sendPort, 'UIPort');
-
-  foregroundReceivePort.listen((message) {
-      debugPrint("Message reçu dans main: $message");
-
-      AppLogger.talker.log(message['message'], logLevel: LogLevel.values.byName(message['level']));
-  });
-
+  IsolateNameServer.registerPortWithName(
+      foregroundReceivePort.sendPort, 'UIPort');
 
   // Créer l'instance de MyappArgs
   final myappArgs = MyappArgs();
@@ -56,14 +60,86 @@ void main() async {
     ..indicatorColor = Colors.grey
     ..maskType = EasyLoadingMaskType.black;
 
-  // Démarrer l'application en utilisant ProviderScope
+  // Initialisation des paramètres de notification
+  await InitNotificationChannel ();
+
+  // Ecoute les messages envoyés par Traitements ou BackgroundService
+  foregroundReceivePort.listen((message) async {
+    debugPrint("Message reçu dans main: $message");
+    switch (message['command']) {
+      case 'logMessage':
+        AppLogger.talker.log(message['message'],
+            logLevel: LogLevel.values.byName(message['level']));
+        break;
+      case 'notification':
+        const AndroidNotificationDetails androidPlatformChannelSpecifics =
+            AndroidNotificationDetails(
+          'channel_id', // ID unique du canal
+          'channel_name', // Nom du canal visible par l'utilisateur
+          channelDescription: 'Description du canal', // Description
+          importance: Importance.high,
+          priority: Priority.high,
+          showWhen: true,
+        );
+        const NotificationDetails platformChannelSpecifics =
+            NotificationDetails(
+          android: androidPlatformChannelSpecifics,
+        );
+        await flutterLocalNotificationsPlugin.show(
+          1, // ID de la notification (doit être unique)
+          message['title'],
+          message['body'],
+          platformChannelSpecifics,
+        );
+        break;
+      default:
+        AppLogger.talker.log(message.toString(), logLevel: LogLevel.error);
+    }
+  });
+
   runApp(
     Builder(
       builder: (BuildContext context) {
-        return MyApp(args: myappArgs, foregroundStreamReceivePort: foregroundStreamReceivePort).build(context);
+        return MyApp(
+                args: myappArgs,
+                foregroundStreamReceivePort: foregroundStreamReceivePort)
+            .build(context);
       },
-    ),// Passez les arguments à l'app
+    ),
   );
+}
+
+Future<void> InitNotificationChannel() async {
+  const AndroidNotificationChannel channel = AndroidNotificationChannel(
+    'channel_id', // ID unique
+    'channel_name', // Nom visible par l'utilisateur
+    description: 'Description du canal', // Description optionnelle
+    importance: Importance.high, // Importance de la notification
+  );
+
+  Future<void> initializeNotificationChannel() async {
+    final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin =
+    FlutterLocalNotificationsPlugin();
+
+    final AndroidNotificationChannelGroup channelGroup =
+    AndroidNotificationChannelGroup(
+      'group_id', // ID unique du groupe
+      'Group Name', // Nom du groupe visible par l'utilisateur
+    );
+
+    await flutterLocalNotificationsPlugin
+        .resolvePlatformSpecificImplementation<
+        AndroidFlutterLocalNotificationsPlugin>()
+        ?.createNotificationChannel(channel);
+  }
+}
+Future<void> requestNotificationPermission() async {
+  if (Platform.isAndroid) {
+    final status = await Permission.notification.request();
+    if (status.isDenied || status.isPermanentlyDenied) {
+      debugPrint("L'utilisateur a refusé les notifications.");
+    }
+  }
 }
 
 void _initPrefs() {
@@ -105,7 +181,6 @@ class MyApp {
 
   // This widget is the root of your application.
   Widget build(BuildContext context) {
-
     return MaterialApp(
         title: 'Flutter Demo',
         builder: EasyLoading.init(),
@@ -155,7 +230,6 @@ class MyappArgs extends MapBase<String, dynamic> {
 
   set backgroundService(BackgroundServiceManager? value) =>
       this['backgroundService'] = value;
-
 }
 
 class AppLogger extends Talker {

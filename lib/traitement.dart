@@ -16,12 +16,16 @@ class Traitement {
   late StreamController<void> _pauseController;
   late final AppDatabase _database;
   late final Function(String message, {TalkerLogType level}) _logMessage;
+  late final Function(String title, String body) _notification;
 
-  Traitement (AppDatabase database, {bool paused = true, required void Function(String message, {TalkerLogType level}) logMessage}) {
+  Traitement (AppDatabase database, {bool paused = true,
+    required void Function(String message, {TalkerLogType level}) logMessage,
+    required void Function(String title, String body) notification}) {
     _isPaused = paused;
     _database = database;
     _pauseController = StreamController<void>.broadcast();
     _logMessage = logMessage;
+    _notification = notification;
   }
 
   Future<void> loadState() async {
@@ -39,7 +43,7 @@ class Traitement {
   Future<void> doWork(ServiceInstance service, SharedPreferences prefs) async {
 
     if (_isPaused) {
-      debugPrint("Traitement en pause, sortie.");
+      _database.customStatement('select 1');
       _logMessage("Traitement en pause, sortie.", level: TalkerLogType.info);
       return;
     }
@@ -83,6 +87,8 @@ class Traitement {
 
   Future<void> _traiteCache(ServiceInstance service, SharedPreferences prefs) async {
     final List<Message> messages = await _database.getMessagesNotSent();
+
+    _notification("Traitement terminé", "Nombre de messages : ${messages.length}");
 
     debugPrint("requete terminee");
 

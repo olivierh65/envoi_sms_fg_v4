@@ -83,8 +83,9 @@ class BackgroundServiceManager {
     final database = AppDatabase();
     logMessage("Database initialized", level: TalkerLogType.info);
 
+
     // Initialiser le traitement
-    final traitement = Traitement(database, logMessage: logMessage);
+    final traitement = Traitement(database, logMessage: logMessage, notification: notification);
     logMessage("Traitement initialized", level: TalkerLogType.info);
 
     final completer = Completer<void>();
@@ -145,6 +146,10 @@ class BackgroundServiceManager {
       service.on('update').listen((event) {
         UIStreamSendPort?.send(event);
       });
+
+      // Lance le Traitement, en pause
+      traitement.pause();
+      traitement.doWork(service, prefs);
     }
   }
 
@@ -183,8 +188,11 @@ class BackgroundServiceManager {
   }
 
   static void logMessage(String message, {TalkerLogType level = TalkerLogType.debug}) {
+    UISendPort?.send({'command': 'logMessage', 'message': message, 'level': level.name});
+  }
 
-    UISendPort?.send({'message': message, 'level': level.name});
+  static void notification(String title, String body) {
+    UISendPort?.send({'command': 'notification', 'title': title, 'body': body});
   }
 
   static bool onIosBackground(ServiceInstance service) {
