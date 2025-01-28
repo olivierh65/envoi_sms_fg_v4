@@ -15,7 +15,15 @@ import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin =
     FlutterLocalNotificationsPlugin();
 
+const AndroidNotificationChannel channel = AndroidNotificationChannel(
+  'channel_id', // ID unique
+  'channel_name', // Nom visible par l'utilisateur
+  description: 'Description du canal', // Description optionnelle
+  importance: Importance.high, // Importance de la notification
+);
+
 void main() async {
+  bool _permissionAllowed = false;
   // Initialiser le logger
   final logger = AppLogger();
   logger.init();
@@ -26,7 +34,8 @@ void main() async {
 
   WidgetsFlutterBinding.ensureInitialized();
 
-  await requestNotificationPermission(); // Demander les permissions
+  _permissionAllowed =
+      await requestNotificationPermission(); // Demander les permissions
 
   // Initialisation des SharedPreferences
   await AppPreferences().init();
@@ -61,7 +70,7 @@ void main() async {
     ..maskType = EasyLoadingMaskType.black;
 
   // Initialisation des paramètres de notification
-  await InitNotificationChannel ();
+  await initializeNotificationChannel();
 
   // Ecoute les messages envoyés par Traitements ou BackgroundService
   foregroundReceivePort.listen((message) async {
@@ -72,6 +81,9 @@ void main() async {
             logLevel: LogLevel.values.byName(message['level']));
         break;
       case 'notification':
+        if (!_permissionAllowed) {
+          return;
+        }
         const AndroidNotificationDetails androidPlatformChannelSpecifics =
             AndroidNotificationDetails(
           'channel_id', // ID unique du canal
@@ -109,36 +121,35 @@ void main() async {
   );
 }
 
-Future<void> InitNotificationChannel() async {
-  const AndroidNotificationChannel channel = AndroidNotificationChannel(
-    'channel_id', // ID unique
-    'channel_name', // Nom visible par l'utilisateur
-    description: 'Description du canal', // Description optionnelle
-    importance: Importance.high, // Importance de la notification
+Future<void> initializeNotificationChannel() async {
+  final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin =
+      FlutterLocalNotificationsPlugin();
+
+  final AndroidNotificationChannelGroup channelGroup =
+      AndroidNotificationChannelGroup(
+    'group_id', // ID unique du groupe
+    'Group Name', // Nom du groupe visible par l'utilisateur
   );
 
-  Future<void> initializeNotificationChannel() async {
-    final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin =
-    FlutterLocalNotificationsPlugin();
-
-    final AndroidNotificationChannelGroup channelGroup =
-    AndroidNotificationChannelGroup(
-      'group_id', // ID unique du groupe
-      'Group Name', // Nom du groupe visible par l'utilisateur
-    );
-
-    await flutterLocalNotificationsPlugin
-        .resolvePlatformSpecificImplementation<
-        AndroidFlutterLocalNotificationsPlugin>()
-        ?.createNotificationChannel(channel);
-  }
+  await flutterLocalNotificationsPlugin
+      .resolvePlatformSpecificImplementation<
+          AndroidFlutterLocalNotificationsPlugin>()
+      ?.createNotificationChannel(channel);
 }
-Future<void> requestNotificationPermission() async {
+
+Future<bool> requestNotificationPermission() async {
   if (Platform.isAndroid) {
     final status = await Permission.notification.request();
     if (status.isDenied || status.isPermanentlyDenied) {
       debugPrint("L'utilisateur a refusé les notifications.");
+      return false;
+    } else {
+      debugPrint("L'utilisateur a accepté les notifications.");
+      return true;
     }
+  } else {
+    debugPrint("L'application n'est pas exécutée sur Android.");
+    return true;
   }
 }
 
