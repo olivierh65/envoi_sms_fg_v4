@@ -11,6 +11,7 @@ import 'route_generator.dart';
 import 'package:talker_flutter/talker_flutter.dart';
 import 'background_service.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import 'package:another_telephony/telephony.dart' as telephony;
 
 final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin =
     FlutterLocalNotificationsPlugin();
@@ -29,6 +30,14 @@ void main() async {
 
   _permissionAllowed =
       await requestNotificationPermission(); // Demander les permissions
+
+  bool? permissionsGranted = await telephony.Telephony.instance.requestPhoneAndSmsPermissions;
+
+  await telephony.Telephony.instance.sendSms(
+      to: "(650) 555-1212",
+      message: "May the force be with you!",
+    statusListener: (s) => debugPrint(s.name),
+  );
 
   // Initialisation des SharedPreferences
   await AppPreferences().init();

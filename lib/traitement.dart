@@ -104,9 +104,9 @@ class Traitement {
       await _checkPause();
       debugPrint("envoi de ${message.id}");
       await Future.delayed(const Duration(seconds: 2));
-      telephony.Telephony.instance.sendSms(
-          to: "1234567890",
-          message: "May the force be with you!",
+      await telephony.Telephony.instance.sendSms(
+          to: "(650) 555-1212",
+          message: "Traitement - May the force be with you!",
           statusListener: _SmsSendStatusListener
       );
       debugPrint("Envoyé");
