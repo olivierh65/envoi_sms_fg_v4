@@ -134,6 +134,7 @@ class BackgroundServiceManager {
         _stopTimer();
         service.invoke('update', {"current_time": 'Pause'});
         logMessage("Traitement en pause", level: TalkerLogType.info);
+        notification("Traitement en pause", "Le traitement est en pause.");
       });
 
       service.on('resume').listen((_) {
@@ -141,6 +142,7 @@ class BackgroundServiceManager {
         traitement.doWork(service, prefs);
         _startTimer(service, traitement);
         logMessage("Traitement repris", level: TalkerLogType.info);
+        notification("Traitement repris", "Le traitement a été repris.");
       });
 
       service.on('update').listen((event) {

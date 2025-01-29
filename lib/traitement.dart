@@ -5,18 +5,21 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter_background_service/flutter_background_service.dart';
 import 'package:http/http.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:drift/drift.dart';
+import 'package:drift/drift.dart' as drift;
 import 'package:talker_flutter/talker_flutter.dart';
 import 'database.dart'; // fichier Drift
+import 'package:another_telephony/telephony.dart' as telephony;
 
 class Traitement {
   // Déclarez un Completer pour suivre l'état du traitement
   Completer<void>? completer;
   static bool _isPaused  = false;
   late StreamController<void> _pauseController;
+  late final telephony.SmsSendStatusListener _SmsSendStatusListener;
   late final AppDatabase _database;
   late final Function(String message, {TalkerLogType level}) _logMessage;
   late final Function(String title, String body) _notification;
+  late List<dynamic> _jsonData;
 
   Traitement (AppDatabase database, {bool paused = true,
     required void Function(String message, {TalkerLogType level}) logMessage,
@@ -26,6 +29,9 @@ class Traitement {
     _pauseController = StreamController<void>.broadcast();
     _logMessage = logMessage;
     _notification = notification;
+    _SmsSendStatusListener = (telephony.SendStatus status) {
+      _logMessage("Suivi de l'envoi : ${status.toString()}", level: TalkerLogType.debug);
+    };
   }
 
   Future<void> loadState() async {
@@ -45,6 +51,8 @@ class Traitement {
     if (_isPaused) {
       _database.customStatement('select 1');
       _logMessage("Traitement en pause, sortie.", level: TalkerLogType.info);
+      _notification("Traitement en pause", "Sortie du traitement.");
+
       return;
     }
     debugPrint("Entree doWork");
@@ -59,18 +67,18 @@ class Traitement {
 
 
     if ((resp != null) && (resp.contentLength! > 0)) {
-      List<dynamic> jsonData = jsonDecode(resp.body);
+      _jsonData = jsonDecode(resp.body);
 
-      for (var item in jsonData) {
+      for (var item in _jsonData) {
         try {
           if (await _database.isMessageExist(item['messageId'], item['jobId']) == 0) {
             await _database.insertMessage(
               MessagesCompanion(
-                number: Value(item['number']),
-                message: Value(item['message']),
-                messageId: Value(item['messageId']),
-                jobId: Value(item['jobId']),
-                retrieveDate: Value(DateTime.now()),
+                number: drift.Value(item['number']),
+                message: drift.Value(item['message']),
+                messageId: drift.Value(item['messageId']),
+                jobId: drift.Value(item['jobId']),
+                retrieveDate: drift.Value(DateTime.now()),
               ),
             );
           }
@@ -96,6 +104,11 @@ class Traitement {
       await _checkPause();
       debugPrint("envoi de ${message.id}");
       await Future.delayed(const Duration(seconds: 2));
+      telephony.Telephony.instance.sendSms(
+          to: "1234567890",
+          message: "May the force be with you!",
+          statusListener: _SmsSendStatusListener
+      );
       debugPrint("Envoyé");
       await _database.updateMessageSent(
         message.id,

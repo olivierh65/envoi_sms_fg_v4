@@ -15,13 +15,6 @@ import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin =
     FlutterLocalNotificationsPlugin();
 
-const AndroidNotificationChannel channel = AndroidNotificationChannel(
-  'channel_id', // ID unique
-  'channel_name', // Nom visible par l'utilisateur
-  description: 'Description du canal', // Description optionnelle
-  importance: Importance.high, // Importance de la notification
-);
-
 void main() async {
   bool _permissionAllowed = false;
   // Initialiser le logger
@@ -70,6 +63,15 @@ void main() async {
     ..maskType = EasyLoadingMaskType.black;
 
   // Initialisation des paramètres de notification
+  const AndroidInitializationSettings initializationSettingsAndroid =
+  AndroidInitializationSettings('@mipmap/ic_launcher'); // Icône par défaut
+
+  const InitializationSettings initializationSettings = InitializationSettings(
+    android: initializationSettingsAndroid,
+  );
+
+  await flutterLocalNotificationsPlugin.initialize(
+      initializationSettings);
   await initializeNotificationChannel();
 
   // Ecoute les messages envoyés par Traitements ou BackgroundService
@@ -121,19 +123,26 @@ void main() async {
   );
 }
 
+const AndroidNotificationChannel channel = AndroidNotificationChannel(
+  'channel_id', // ID unique
+  'channel_name', // Nom visible par l'utilisateur
+  description: 'Description du canal', // Description optionnelle
+  importance: Importance.high, // Importance de la notification
+);
+
 Future<void> initializeNotificationChannel() async {
   final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin =
-      FlutterLocalNotificationsPlugin();
+  FlutterLocalNotificationsPlugin();
 
   final AndroidNotificationChannelGroup channelGroup =
-      AndroidNotificationChannelGroup(
+  AndroidNotificationChannelGroup(
     'group_id', // ID unique du groupe
     'Group Name', // Nom du groupe visible par l'utilisateur
   );
 
   await flutterLocalNotificationsPlugin
       .resolvePlatformSpecificImplementation<
-          AndroidFlutterLocalNotificationsPlugin>()
+      AndroidFlutterLocalNotificationsPlugin>()
       ?.createNotificationChannel(channel);
 }
 
