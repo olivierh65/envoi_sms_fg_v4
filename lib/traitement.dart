@@ -7,71 +7,89 @@ import 'package:http/http.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:drift/drift.dart' as drift;
 import 'package:talker_flutter/talker_flutter.dart';
+import 'app_preferences.dart';
 import 'database.dart'; // fichier Drift
 import 'package:another_telephony/telephony.dart' as telephony;
 
 class Traitement {
   // Déclarez un Completer pour suivre l'état du traitement
   Completer<void>? completer;
-  static bool _isPaused  = false;
+  static bool _isPaused = false;
   late StreamController<void> _pauseController;
   late final telephony.SmsSendStatusListener _SmsSendStatusListener;
   late final AppDatabase _database;
   late final Function(String message, {TalkerLogType level}) _logMessage;
   late final Function(String title, String body) _notification;
   late List<dynamic> _jsonData;
+  static late DateTime _lastGetMessages;
+  static late DateTime _lastSmsSent;
 
-  Traitement (AppDatabase database, {bool paused = true,
-    required void Function(String message, {TalkerLogType level}) logMessage,
-    required void Function(String title, String body) notification}) {
+  Traitement(AppDatabase database,
+      {bool paused = true,
+      required void Function(String message, {TalkerLogType level}) logMessage,
+      required void Function(String title, String body) notification}) {
     _isPaused = paused;
     _database = database;
     _pauseController = StreamController<void>.broadcast();
     _logMessage = logMessage;
     _notification = notification;
     _SmsSendStatusListener = (telephony.SendStatus status) {
-      _logMessage("Suivi de l'envoi : ${status.toString()}", level: TalkerLogType.debug);
+      _logMessage("Suivi de l'envoi : ${status.toString()}",
+          level: TalkerLogType.debug);
     };
-  }
-
-  Future<void> loadState() async {
-    // Simule la récupération de l'état sauvegardé
-    debugPrint('État chargé : étape');
-  }
-
-  Future<void> saveState(int step) async {
-    // Simule la sauvegarde de l'état
-    debugPrint('Sauvegarde de l\'état : étape $step');
-    await Future.delayed(Duration(milliseconds: 500)); // Simule une écriture en DB
-    // _setSavedState(step);
+    _lastGetMessages = DateTime.fromMicrosecondsSinceEpoch(0);
+    _lastSmsSent = DateTime.fromMicrosecondsSinceEpoch(0);
   }
 
   Future<void> doWork(ServiceInstance service, SharedPreferences prefs) async {
+    final List<Message> messages = await _database.getMessagesNotSent();
+    _notification(
+        "Traitement terminé", "Nombre de messages : ${messages.length}");
+    debugPrint("requete terminee");
+    _database.customStatement('select 1');
+    _logMessage("Update Stream Drift", level: TalkerLogType.info);
+    // _notification("doWork", "Update Stream Drift");
 
-    if (_isPaused) {
-      _database.customStatement('select 1');
-      _logMessage("Traitement en pause, sortie.", level: TalkerLogType.info);
-      _notification("Traitement en pause", "Sortie du traitement.");
-
-      return;
-    }
     debugPrint("Entree doWork");
 
-    await _checkPause();
-    await _traiteCache(service, prefs);
-    await _checkPause();
+    while (true) {
+      await _checkPause();
+      // Reprend les traitements sauvegardés et les traite
+      await _traiteCache(service, prefs as AppPreferences);
+      await _checkPause();
 
+      // Recupere les données depuis le serveur
+      await _getMessages(service, prefs as AppPreferences);
+      await _checkPause();
+    }
+    if (!completer!.isCompleted) {
+      completer!.complete(); // Signaler la fin du traitement
+    }
+  }
+
+  Future<void> _getMessages(
+      ServiceInstance service, AppPreferences prefs) async {
+    Duration nextQuery = _lastGetMessages
+        .add(prefs.getDuration('queryInterval')!)
+        .difference(DateTime.now());
+    if (!nextQuery.isNegative) {
+      await Future.delayed(nextQuery);
+    }
+    // Recupere les données depuis le serveur
     service.invoke('querydb', {'show': 'Query DB ...'});
     Response? resp = await _getList(prefs);
     service.invoke('querydb', {'hide': ''});
 
+    _lastGetMessages = DateTime.now();
 
     if ((resp != null) && (resp.contentLength! > 0)) {
       _jsonData = jsonDecode(resp.body);
 
       for (var item in _jsonData) {
         try {
-          if (await _database.isMessageExist(item['messageId'], item['jobId']) == 0) {
+          if (await _database.isMessageExist(
+                  item['messageId'], item['jobId']) ==
+              0) {
             await _database.insertMessage(
               MessagesCompanion(
                 number: drift.Value(item['number']),
@@ -87,34 +105,36 @@ class Traitement {
         }
       }
     }
-
-    if (!completer!.isCompleted) {
-      completer!.complete(); // Signaler la fin du traitement
-    }
   }
 
-  Future<void> _traiteCache(ServiceInstance service, SharedPreferences prefs) async {
+  Future<void> _traiteCache(
+      ServiceInstance service, AppPreferences prefs) async {
     final List<Message> messages = await _database.getMessagesNotSent();
-
-    _notification("Traitement terminé", "Nombre de messages : ${messages.length}");
-
+    _notification(
+        "Traitement terminé", "Nombre de messages : ${messages.length}");
     debugPrint("requete terminee");
 
     for (var message in messages) {
       await _checkPause();
       debugPrint("envoi de ${message.id}");
-      await Future.delayed(const Duration(seconds: 2));
+
+      Duration nextSms = _lastSmsSent
+          .add(prefs.getDuration('sendInterval')!)
+          .difference(DateTime.now());
+      if (!nextSms.isNegative) {
+        await Future.delayed(nextSms);
+      }
       await telephony.Telephony.instance.sendSms(
           to: "(650) 555-1212",
           message: "Traitement - May the force be with you!",
-          statusListener: _SmsSendStatusListener
-      );
+          statusListener: _SmsSendStatusListener);
+      _lastSmsSent = DateTime.now();
+
       debugPrint("Envoyé");
       await _database.updateMessageSent(
         message.id,
         message.jobId,
       );
-
     }
   }
 
@@ -133,11 +153,12 @@ class Traitement {
   void resume() {
     if (_isPaused) {
       _isPaused = false;
-      _pauseController.add(null); // Envoie le signal pour débloquer `_checkPause`
+      _pauseController
+          .add(null); // Envoie le signal pour débloquer `_checkPause`
     }
   }
 
-  _getList(SharedPreferences prefs) async {
+  _getList(AppPreferences prefs) async {
     final String? url = prefs.getString('sendUrl');
     _logMessage("Requête vers $url", level: TalkerLogType.info);
     if (url == null) {

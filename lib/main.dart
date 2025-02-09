@@ -186,13 +186,13 @@ void _initPrefs() {
         'statusUrl', 'http://dev10.mcm65.famh.fr/civicrm/smshub/status');
   }
   if (!AppPreferences().containsKey('queryInterval')) {
-    AppPreferences().setString('queryInterval', '1');
+    AppPreferences().setDuration('queryInterval', Duration(minutes: 1));
   }
   if (!AppPreferences().containsKey('deviceId')) {
     AppPreferences().setString('deviceId', '1');
   }
   if (!AppPreferences().containsKey('sendInterval')) {
-    AppPreferences().setString('sendInterval', '500');
+    AppPreferences().setDuration('sendInterval', Duration(seconds: 1, milliseconds: 200));
   }
   if (!AppPreferences().containsKey('webApiKey')) {
     AppPreferences().setString('webApiKey', '');

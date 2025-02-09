@@ -120,6 +120,7 @@ class BackgroundServiceManager {
         }
       });
 
+      /*
       service.on('startTraitement').listen((event) {
         traitement.doWork(service, prefs);
         _startTimer(service, traitement); // Démarrer le timer ici
@@ -128,13 +129,13 @@ class BackgroundServiceManager {
       service.on('stopTraitement').listen((event) {
         traitement.stopProcessing();
       });
-
+*/
       service.on('pause').listen((_) {
         traitement.pause();
         _stopTimer();
         service.invoke('update', {"current_time": 'Pause'});
         logMessage("Traitement en pause", level: TalkerLogType.info);
-        notification("Traitement en pause", "Le traitement est en pause.");
+        // notification("Traitement en pause", "Le traitement est en pause.");
       });
 
       service.on('resume').listen((_) {
@@ -142,7 +143,7 @@ class BackgroundServiceManager {
         traitement.doWork(service, prefs);
         _startTimer(service, traitement);
         logMessage("Traitement repris", level: TalkerLogType.info);
-        notification("Traitement repris", "Le traitement a été repris.");
+        // notification("Traitement repris", "Le traitement a été repris.");
       });
 
       service.on('update').listen((event) {
@@ -156,6 +157,7 @@ class BackgroundServiceManager {
   }
 
   static void _startTimer(ServiceInstance service, Traitement traitement) {
+    return;
     _timer = Timer.periodic(const Duration(seconds: 5), (timer) async {
       debugPrint("Heure actuelle : ${DateTime.now()}");
       service.invoke('update', {
@@ -171,6 +173,7 @@ class BackgroundServiceManager {
     }
   }
 
+  /*
   //Méthode pour declencher startProcessing depuis Accueil
   void startTraitement() {
     _service.invoke("startTraitement");
@@ -180,6 +183,7 @@ class BackgroundServiceManager {
   void stopTraitement() {
     _service.invoke("stopTraitement");
   }
+*/
 
   void pauseTraitement() {
     _service.invoke('pause');
