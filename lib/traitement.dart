@@ -18,6 +18,7 @@ class Traitement {
   late StreamController<void> _pauseController;
   late final telephony.SmsSendStatusListener _SmsSendStatusListener;
   late final AppDatabase _database;
+  late final AppPreferences _preferences;
   late final Function(String message, {TalkerLogType level}) _logMessage;
   late final Function(String title, String body) _notification;
   late List<dynamic> _jsonData;
@@ -25,11 +26,14 @@ class Traitement {
   static late DateTime _lastSmsSent;
 
   Traitement(AppDatabase database,
-      {bool paused = true,
+      {
+        required AppPreferences preferences,
+        bool paused = true,
       required void Function(String message, {TalkerLogType level}) logMessage,
       required void Function(String title, String body) notification}) {
     _isPaused = paused;
     _database = database;
+    _preferences = preferences;
     _pauseController = StreamController<void>.broadcast();
     _logMessage = logMessage;
     _notification = notification;
@@ -55,11 +59,11 @@ class Traitement {
     while (true) {
       await _checkPause();
       // Reprend les traitements sauvegardés et les traite
-      await _traiteCache(service, prefs as AppPreferences);
+      await _traiteCache(service, _preferences);
       await _checkPause();
 
       // Recupere les données depuis le serveur
-      await _getMessages(service, prefs as AppPreferences);
+      await _getMessages(service, _preferences);
       await _checkPause();
     }
     if (!completer!.isCompleted) {

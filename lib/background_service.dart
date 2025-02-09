@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter_background_service/flutter_background_service.dart';
 import 'package:talker_flutter/talker_flutter.dart';
+import 'app_preferences.dart';
 import 'traitement.dart';
 import 'database.dart';
 
@@ -79,13 +80,16 @@ class BackgroundServiceManager {
     });
 
     final prefs = await SharedPreferences.getInstance();
+    final appPreferences = AppPreferences();
+    await appPreferences.init();
+    var a= appPreferences.getDuration('queryInterval');
     // Initialiser la base de données
     final database = AppDatabase();
     logMessage("Database initialized", level: TalkerLogType.info);
 
 
     // Initialiser le traitement
-    final traitement = Traitement(database, logMessage: logMessage, notification: notification);
+    final traitement = Traitement(database, preferences: appPreferences, logMessage: logMessage, notification: notification);
     logMessage("Traitement initialized", level: TalkerLogType.info);
 
     final completer = Completer<void>();
@@ -140,7 +144,7 @@ class BackgroundServiceManager {
 
       service.on('resume').listen((_) {
         traitement.resume();
-        traitement.doWork(service, prefs);
+        // traitement.doWork(service, prefs);
         _startTimer(service, traitement);
         logMessage("Traitement repris", level: TalkerLogType.info);
         // notification("Traitement repris", "Le traitement a été repris.");

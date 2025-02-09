@@ -33,12 +33,6 @@ void main() async {
 
   bool? permissionsGranted = await telephony.Telephony.instance.requestPhoneAndSmsPermissions;
 
-  await telephony.Telephony.instance.sendSms(
-      to: "(650) 555-1212",
-      message: "May the force be with you!",
-    statusListener: (s) => debugPrint(s.name),
-  );
-
   // Initialisation des SharedPreferences
   await AppPreferences().init();
 
